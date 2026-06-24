@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Focus Sessions</title>
+<style>
+  :root{
+    --bg:#0f1115;
+    --bg-soft:#171a21;
+    --card:#1c2029;
+    --card-2:#232834;
+    --line:#2c3240;
+    --text:#e8ecf3;
+    --muted:#9aa4b5;
+    --faint:#6b7585;
+    --accent:#6366f1;
+    --accent-2:#818cf8;
+    --green:#22c55e;
+    --amber:#f59e0b;
+    --red:#ef4444;
+    --shadow:0 10px 30px rgba(0,0,0,.35);
+    --radius:18px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,system-ui,sans-serif;
+    background:radial-gradient(1200px 800px at 70% -10%, #1a1f2b 0%, var(--bg) 55%);
+    color:var(--text);
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:760px;margin:0 auto;padding:24px 20px 80px}
+
+  header.app{
+    display:flex;align-items:center;justify-content:space-between;
+    margin-bottom:22px;gap:12px;flex-wrap:wrap;
+  }
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;letter-spacing:.2px}
+  .brand .dot{width:11px;height:11px;border-radius:50%;background:var(--accent);box-shadow:0 0 16px var(--accent)}
+  nav.tabs{display:flex;gap:6px;background:var(--bg-soft);border:1px solid var(--line);padding:5px;border-radius:14px}
+  nav.tabs button{
+    background:transparent;border:none;color:var(--muted);font-weight:600;font-size:14px;
+    padding:8px 16px;border-radius:10px;cursor:pointer;transition:.15s;
+  }
+  nav.tabs button.active{background:var(--accent);color:#fff;box-shadow:0 4px 14px rgba(99,102,241,.4)}
+  nav.tabs button:not(.active):hover{color:var(--text)}
+
+  .sync{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:700;letter-spacing:.4px;
+    padding:4px 9px;border-radius:20px;margin-left:10px;border:1px solid var(--line);color:var(--muted);
+    text-transform:uppercase;vertical-align:middle;cursor:default;transition:.2s}
+  .sync::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--faint);flex:0 0 auto}
+  .sync.ok{color:var(--green);border-color:rgba(34,197,94,.35)}
+  .sync.ok::before{background:var(--green);box-shadow:0 0 8px var(--green)}
+  .sync.off{color:var(--amber);border-color:rgba(245,158,11,.35)}
+  .sync.off::before{background:var(--amber)}
+  .sync.busy{color:var(--accent-2);border-color:rgba(99,102,241,.35)}
+  .sync.busy::before{background:var(--accent-2)}
+  .unsynced-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--amber);margin-left:7px;vertical-align:middle}
+  .user-pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;letter-spacing:.3px;
+    padding:4px 10px;border-radius:20px;margin-left:8px;border:1px solid var(--line);color:var(--accent-2);
+    cursor:pointer;vertical-align:middle;transition:.15s}
+  .user-pill:hover{border-color:var(--accent);color:#fff}
+
+  .view{display:none;animation:fade .25s ease}
+  .view.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:22px;box-shadow:var(--shadow)}
+  .card + .card{margin-top:16px}
+
+  label.field{display:block;font-size:13px;color:var(--muted);font-weight:600;margin-bottom:8px;letter-spacing:.2px}
+  textarea,input[type=text]{
+    width:100%;background:var(--bg-soft);border:1px solid var(--line);border-radius:12px;
+    color:var(--text);font-size:15px;padding:13px 14px;font-family:inherit;resize:vertical;outline:none;transition:.15s;
+  }
+  textarea:focus,input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(99,102,241,.18)}
+  textarea::placeholder{color:var(--faint)}
+
+  .pills{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+  .pill{
+    background:var(--bg-soft);border:1px solid var(--line);color:var(--muted);
+    padding:9px 16px;border-radius:11px;cursor:pointer;font-weight:600;font-size:14px;transition:.15s;
+  }
+  .pill.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  .pill:not(.active):hover{color:var(--text);border-color:var(--faint)}
+
+  .btn{
+    border:none;border-radius:13px;font-weight:700;font-size:15px;padding:14px 22px;cursor:pointer;
+    transition:.15s;display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  }
+  .btn.primary{background:var(--accent);color:#fff;box-shadow:0 6px 18px rgba(99,102,241,.35)}
+  .btn.primary:hover{background:var(--accent-2)}
+  .btn.primary:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
+  .btn.ghost{background:var(--card-2);color:var(--text);border:1px solid var(--line)}
+  .btn.ghost:hover{border-color:var(--faint)}
+  .btn.danger{background:transparent;color:var(--red);border:1px solid rgba(239,68,68,.4)}
+  .btn.danger:hover{background:rgba(239,68,68,.12)}
+  .btn.block{width:100%}
+  .btn.lg{padding:16px 26px;font-size:16px}
+
+  .row{display:flex;gap:12px}
+  .row.wrap{flex-wrap:wrap}
+
+  .today{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:14px;margin-top:14px;justify-content:center}
+  .today b{color:var(--text)}
+
+  /* ---- Active session ---- */
+  .timer-stage{display:flex;flex-direction:column;align-items:center;text-align:center}
+  .plan-chip{
+    background:var(--bg-soft);border:1px solid var(--line);border-radius:12px;padding:11px 16px;
+    color:var(--text);font-size:15px;max-width:100%;margin-bottom:20px;line-height:1.45;
+  }
+  .plan-chip .lab{display:block;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--faint);margin-bottom:4px;font-weight:700}
+  .ring-wrap{position:relative;width:280px;height:280px;margin:6px 0 8px}
+  .ring-wrap svg{transform:rotate(-90deg)}
+  .ring-track{fill:none;stroke:var(--line);stroke-width:14}
+  .ring-prog{fill:none;stroke:var(--accent);stroke-width:14;stroke-linecap:round;transition:stroke-dashoffset .25s linear, stroke .25s}
+  .ring-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .time{font-size:58px;font-weight:800;letter-spacing:1px;font-variant-numeric:tabular-nums;line-height:1}
+  .time-sub{color:var(--muted);font-size:13px;margin-top:8px}
+  .badge-paused{display:inline-block;margin-top:10px;background:rgba(245,158,11,.16);color:var(--amber);
+    font-weight:700;font-size:12px;letter-spacing:1px;padding:5px 12px;border-radius:20px;text-transform:uppercase}
+
+  .ctrl-row{display:flex;gap:12px;width:100%;margin-top:22px}
+  .ctrl-row .btn{flex:1}
+
+  .meta-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px;width:100%}
+  .meta{background:var(--bg-soft);border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center}
+  .meta .k{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.6px;font-weight:700}
+  .meta .v{font-size:18px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums}
+
+  /* ---- Report ---- */
+  .report-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:12px;flex-wrap:wrap}
+  .day{margin-top:24px}
+  .day:first-child{margin-top:0}
+  .day-title{font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px}
+  .day-stats{display:flex;gap:14px;flex-wrap:wrap;color:var(--muted);font-size:13px;margin-bottom:12px}
+  .day-stats span b{color:var(--text)}
+  .day-stats .sep{color:var(--line)}
+
+  .sess{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:10px}
+  .sess-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+  .sess-time{font-weight:700;font-size:14px;font-variant-numeric:tabular-nums}
+  .sess-time .arrow{color:var(--faint);margin:0 4px}
+  .tag{font-size:11px;font-weight:700;letter-spacing:.5px;padding:4px 10px;border-radius:20px;text-transform:uppercase}
+  .tag.done{background:rgba(34,197,94,.15);color:var(--green)}
+  .tag.stopped{background:rgba(239,68,68,.15);color:var(--red)}
+  .sess-plan{font-size:15px;margin:6px 0;line-height:1.45}
+  .sess-notes{font-size:14px;color:var(--muted);line-height:1.5;white-space:pre-wrap;background:var(--bg-soft);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:8px}
+  .sess-foot{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:10px;color:var(--faint);font-size:12.5px}
+  .sess-foot b{color:var(--muted)}
+  .reason{color:var(--red)}
+  .lbl{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--faint);font-weight:700;margin:10px 0 2px}
+  .del{margin-left:auto;background:transparent;border:none;color:var(--faint);cursor:pointer;font-size:12.5px;padding:2px 4px}
+  .del:hover{color:var(--red)}
+
+  .empty{text-align:center;color:var(--muted);padding:48px 20px}
+  .empty .big{font-size:40px;margin-bottom:10px}
+
+  /* ---- Modal ---- */
+  .overlay{position:fixed;inset:0;background:rgba(8,10,14,.72);backdrop-filter:blur(4px);
+    display:none;align-items:center;justify-content:center;padding:20px;z-index:50}
+  .overlay.show{display:flex;animation:fade .2s ease}
+  .modal{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:24px;max-width:440px;width:100%;box-shadow:var(--shadow)}
+  .modal h3{margin:0 0 6px;font-size:19px}
+  .modal p{margin:0 0 16px;color:var(--muted);font-size:14px;line-height:1.5}
+  .err{color:var(--red);font-size:13px;margin-top:8px;display:none}
+  .err.show{display:block}
+
+  .footnote{text-align:center;color:var(--faint);font-size:12px;margin-top:26px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="app">
+    <div class="brand"><span class="dot"></span> Focus Sessions<span id="syncPill" class="sync" title="Google Sheet sync">Cloud</span><span id="userPill" class="user-pill" style="display:none" title="Switch user"></span></div>
+    <nav class="tabs">
+      <button id="tab-timer" class="active" data-view="timer">Timer</button>
+      <button id="tab-report" data-view="report">Report</button>
+    </nav>
+  </header>
+
+  <!-- ============ HOME (start a session) ============ -->
+  <section id="view-home" class="view active">
+    <div class="card">
+      <label class="field" for="planInput">What will you do this session?</label>
+      <textarea id="planInput" rows="3" placeholder="e.g. Draft the proposal intro and outline the next 3 sections…"></textarea>
+
+      <label class="field" style="margin-top:18px">Session length</label>
+      <div class="pills" id="minutePills">
+        <div class="pill" data-min="25">25 min</div>
+        <div class="pill active" data-min="30">30 min</div>
+        <div class="pill" data-min="45">45 min</div>
+        <div class="pill" data-min="50">50 min</div>
+        <div class="pill" data-min="60">60 min</div>
+      </div>
+
+      <button id="startBtn" class="btn primary block lg" style="margin-top:22px" disabled>▶ Start session</button>
+      <div class="today" id="todayStats"></div>
+    </div>
+    <p class="footnote">Tip: write your intention first — then start the timer. It auto-saves when it reaches 0:00.</p>
+  </section>
+
+  <!-- ============ ACTIVE SESSION ============ -->
+  <section id="view-active" class="view">
+    <div class="card timer-stage">
+      <div class="plan-chip"><span class="lab">This session</span><span id="activePlan"></span></div>
+
+      <div class="ring-wrap">
+        <svg width="280" height="280" viewBox="0 0 280 280">
+          <circle class="ring-track" cx="140" cy="140" r="120"></circle>
+          <circle class="ring-prog" id="ring" cx="140" cy="140" r="120"></circle>
+        </svg>
+        <div class="ring-center">
+          <div class="time" id="timeDisplay">30:00</div>
+          <div class="time-sub" id="timeSub"></div>
+          <div class="badge-paused" id="pausedBadge" style="display:none">On break</div>
+        </div>
+      </div>
+
+      <div class="meta-grid">
+        <div class="meta"><div class="k">Breaks</div><div class="v" id="mBreaks">0</div></div>
+        <div class="meta"><div class="k">Break time</div><div class="v" id="mBreakTime">0s</div></div>
+        <div class="meta"><div class="k">Started</div><div class="v" id="mStarted">—</div></div>
+      </div>
+
+      <div style="width:100%;margin-top:20px">
+        <label class="field" for="notesInput">Notes — what are you doing / did you do?</label>
+        <textarea id="notesInput" rows="3" placeholder="Jot down progress, blockers, what you got done…"></textarea>
+      </div>
+
+      <div class="ctrl-row">
+        <button id="pauseBtn" class="btn ghost lg">⏸ Pause</button>
+        <button id="stopBtn" class="btn danger lg">⏹ Stop early</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ REPORT ============ -->
+  <section id="view-report" class="view">
+    <div class="report-head">
+      <h2 style="margin:0;font-size:20px">Daily report</h2>
+      <div class="row">
+        <button id="exportBtn" class="btn ghost" style="padding:10px 16px;font-size:13px">⬇ Export CSV</button>
+        <button id="clearBtn" class="btn ghost" style="padding:10px 16px;font-size:13px">Clear all</button>
+      </div>
+    </div>
+    <div id="reportList"></div>
+  </section>
+</div>
+
+<!-- ============ STOP MODAL ============ -->
+<div class="overlay" id="stopOverlay">
+  <div class="modal">
+    <h3>Stop this session early?</h3>
+    <p>You still have <b id="stopRemaining">—</b> left. Add a reason so you can review it later.</p>
+    <label class="field" for="reasonInput">Reason (required)</label>
+    <textarea id="reasonInput" rows="3" placeholder="e.g. Urgent call came in / lost focus / finished the task early…"></textarea>
+    <div class="err" id="reasonErr">Please enter a reason to stop early.</div>
+    <div class="row" style="margin-top:18px">
+      <button id="cancelStop" class="btn ghost block">Keep going</button>
+      <button id="confirmStop" class="btn danger block">Stop &amp; save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ COMPLETE MODAL ============ -->
+<div class="overlay" id="doneOverlay">
+  <div class="modal" style="text-align:center">
+    <div style="font-size:46px;margin-bottom:8px">🎉</div>
+    <h3>Session complete</h3>
+    <p id="doneMsg">Nice work — your session is saved.</p>
+    <div class="row">
+      <button id="doneReport" class="btn ghost block">View report</button>
+      <button id="doneAgain" class="btn primary block">New session</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ USER (name) MODAL ============ -->
+<div class="overlay" id="userOverlay">
+  <div class="modal">
+    <h3>Who's tracking? 👋</h3>
+    <p>Enter your name. Your sessions sync to a shared Google Sheet, and you'll only see your own.</p>
+    <label class="field" for="userInput">Your name</label>
+    <input type="text" id="userInput" placeholder="e.g. Leo" autocomplete="off" />
+    <div class="err" id="userErr">Please enter a name.</div>
+    <div class="row" style="margin-top:18px">
+      <button id="userCancel" class="btn ghost block" style="display:none">Cancel</button>
+      <button id="userSave" class="btn primary block">Continue</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  var STORE_KEY='fs_sessions_v1', ACTIVE_KEY='fs_active_v1', SET_KEY='fs_settings_v1', USER_KEY='fs_user_v1';
+  var TICK=250, RING_R=120, RING_C=2*Math.PI*RING_R;
+
+  // ---- Cloud sync (n8n webhook -> Google Sheet) ----
+  // Set to '' to run fully offline (localStorage only).
+  var WEBHOOK_URL='https://n8n.srv1035791.hstgr.cloud/webhook/focus-sessions';
+  var CLOUD=!!WEBHOOK_URL;
+  var currentUser=load(USER_KEY, '');
+
+  // ---------- state ----------
+  var sessions = load(STORE_KEY, []);
+  var active   = load(ACTIVE_KEY, null);
+  var settings = load(SET_KEY, {minutes:30});
+  var tickHandle = null;
+  var audioCtx = null;
+
+  // ---------- helpers ----------
+  function el(id){ return document.getElementById(id); }
+  function load(k,f){ try{var v=localStorage.getItem(k);return v?JSON.parse(v):f;}catch(e){return f;} }
+  function persist(){
+    localStorage.setItem(STORE_KEY, JSON.stringify(sessions));
+    if(active) localStorage.setItem(ACTIVE_KEY, JSON.stringify(active));
+    else localStorage.removeItem(ACTIVE_KEY);
+    localStorage.setItem(SET_KEY, JSON.stringify(settings));
+  }
+  function nowMs(){ return Date.now(); }
+  function uid(){ return nowMs().toString(36)+Math.random().toString(36).slice(2,7); }
+
+  function dateKey(ms){
+    var d=new Date(ms);
+    return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+  }
+  function pad(n){ return (n<10?'0':'')+n; }
+  function hhmm(ms){ var d=new Date(ms); return pad(d.getHours())+':'+pad(d.getMinutes()); }
+  function mmss(ms){
+    ms=Math.max(0,ms);
+    var s=Math.ceil(ms/1000), m=Math.floor(s/60), ss=s%60;
+    return pad(m)+':'+pad(ss);
+  }
+  function dur(ms){
+    var s=Math.round(ms/1000), h=Math.floor(s/3600), m=Math.floor((s%3600)/60), ss=s%60;
+    if(h>0) return h+'h '+m+'m';
+    if(m>0) return m+'m '+ss+'s';
+    return ss+'s';
+  }
+  function esc(t){ return String(t==null?'':t).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+
+  // ---------- timer math ----------
+  function remainingMs(){
+    if(!active) return 0;
+    if(active.paused) return active.remainingMs;
+    return Math.max(0, active.endsAt - nowMs());
+  }
+  function totalPauseMs(){
+    if(!active) return 0;
+    var sum=0,i;
+    for(i=0;i<active.pauses.length;i++) sum += active.pauses[i].end - active.pauses[i].start;
+    if(active.paused && active.currentPauseStart) sum += nowMs() - active.currentPauseStart;
+    return sum;
+  }
+
+  // ---------- session lifecycle ----------
+  function startSession(plan, minutes){
+    active = {
+      id:uid(), plan:plan, notes:'', plannedMinutes:minutes,
+      startedAt:nowMs(), endsAt:nowMs()+minutes*60000, remainingMs:minutes*60000,
+      paused:false, pauses:[], currentPauseStart:null
+    };
+    persist();
+    el('notesInput').value='';
+    showView('active');
+    renderActive();
+    startTick();
+    requestNotify();
+  }
+
+  function pauseSession(){
+    if(!active || active.paused) return;
+    active.remainingMs = remainingMs();
+    active.paused = true;
+    active.currentPauseStart = nowMs();
+    persist(); renderActive();
+  }
+  function resumeSession(){
+    if(!active || !active.paused) return;
+    active.pauses.push({start:active.currentPauseStart, end:nowMs()});
+    active.currentPauseStart = null;
+    active.paused = false;
+    active.endsAt = nowMs() + active.remainingMs;
+    persist(); renderActive();
+  }
+
+  function finalize(status, reason, endedAtOverride){
+    if(!active) return;
+    if(active.paused && active.currentPauseStart){
+      active.pauses.push({start:active.currentPauseStart, end:nowMs()});
+      active.currentPauseStart=null; active.paused=false;
+    }
+    var endedAt = endedAtOverride || nowMs();
+    var pauseMs=0,i;
+    for(i=0;i<active.pauses.length;i++) pauseMs += active.pauses[i].end - active.pauses[i].start;
+    var focusMs = Math.max(0, (endedAt - active.startedAt) - pauseMs);
+    var rec={
+      id:active.id, date:dateKey(active.startedAt), plan:active.plan, notes:active.notes,
+      plannedMinutes:active.plannedMinutes, startedAt:active.startedAt, endedAt:endedAt,
+      status:status, stopReason:reason||'', pauses:active.pauses.slice(),
+      pauseMs:pauseMs, focusMs:focusMs, synced:false
+    };
+    sessions.push(rec);
+    active=null;
+    stopTick();
+    persist();
+    renderReport(); renderTodayStats();
+    pushSave(rec);
+  }
+
+  function completeSession(){
+    finalize('completed','');
+    beep();
+    notify('Session complete', 'Nice work — your session is saved.');
+    el('doneMsg').textContent = 'Nice work — your session is saved. Take a short break or start the next one.';
+    openModal('doneOverlay');
+  }
+
+  // ---------- ticking ----------
+  function startTick(){
+    stopTick();
+    tickHandle = setInterval(function(){
+      if(!active){ stopTick(); return; }
+      if(!active.paused && remainingMs()<=0){ completeSession(); return; }
+      updateTimer();
+    }, TICK);
+  }
+  function stopTick(){ if(tickHandle){ clearInterval(tickHandle); tickHandle=null; } }
+
+  // ---------- rendering ----------
+  function showView(name){
+    var views=['home','active','report'];
+    for(var i=0;i<views.length;i++){
+      el('view-'+views[i]).classList.toggle('active', views[i]===name);
+    }
+    el('tab-timer').classList.toggle('active', name!=='report');
+    el('tab-report').classList.toggle('active', name==='report');
+  }
+
+  function renderActive(){
+    if(!active) return;
+    el('activePlan').textContent = active.plan;
+    el('mStarted').textContent = hhmm(active.startedAt);
+    el('pauseBtn').innerHTML = active.paused ? '▶ Resume' : '⏸ Pause';
+    el('pauseBtn').classList.toggle('primary', active.paused);
+    el('pauseBtn').classList.toggle('ghost', !active.paused);
+    el('pausedBadge').style.display = active.paused ? 'inline-block' : 'none';
+    el('notesInput').value = active.notes || '';
+    updateTimer();
+  }
+
+  function updateTimer(){
+    if(!active) return;
+    var rem = remainingMs();
+    el('timeDisplay').textContent = mmss(rem);
+    var total = active.plannedMinutes*60000;
+    var frac = total>0 ? Math.max(0,Math.min(1, rem/total)) : 0;
+    var ring = el('ring');
+    ring.style.strokeDasharray = RING_C;
+    ring.style.strokeDashoffset = RING_C*(1-frac);
+    ring.style.stroke = active.paused ? 'var(--amber)' : (frac<0.15 ? 'var(--red)' : 'var(--accent)');
+    el('timeSub').textContent = active.paused ? 'Paused' : ('of '+active.plannedMinutes+' min');
+    el('mBreaks').textContent = active.pauses.length + (active.paused?1:0);
+    el('mBreakTime').textContent = dur(totalPauseMs());
+  }
+
+  function niceDate(key){
+    var p=key.split('-'); var d=new Date(+p[0], +p[1]-1, +p[2]);
+    var today=dateKey(nowMs());
+    var yest=dateKey(nowMs()-86400000);
+    if(key===today) return 'Today';
+    if(key===yest) return 'Yesterday';
+    return d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+  }
+
+  function renderReport(){
+    var box=el('reportList');
+    if(sessions.length===0){
+      box.innerHTML='<div class="empty"><div class="big">🗓️</div><div>No sessions yet.<br>Start your first 30-minute session from the Timer tab.</div></div>';
+      return;
+    }
+    var groups={}, i, s;
+    for(i=0;i<sessions.length;i++){ s=sessions[i]; (groups[s.date]=groups[s.date]||[]).push(s); }
+    var dates=Object.keys(groups).sort().reverse();
+    var html='';
+    for(var d=0; d<dates.length; d++){
+      var list=groups[dates[d]].slice().sort(function(a,b){return a.startedAt-b.startedAt;});
+      var focus=0, brk=0, done=0, stopped=0;
+      for(i=0;i<list.length;i++){
+        focus+=list[i].focusMs; brk+=list[i].pauseMs;
+        if(list[i].status==='completed') done++; else stopped++;
+      }
+      html+='<div class="day">';
+      html+='<div class="day-title">'+esc(niceDate(dates[d]))+'</div>';
+      html+='<div class="day-stats">'+
+            '<span><b>'+list.length+'</b> sessions</span><span class="sep">·</span>'+
+            '<span><b>'+dur(focus)+'</b> focused</span><span class="sep">·</span>'+
+            '<span><b>'+dur(brk)+'</b> on breaks</span><span class="sep">·</span>'+
+            '<span><b>'+done+'</b> completed, <b>'+stopped+'</b> stopped early</span>'+
+            '</div>';
+      for(i=0;i<list.length;i++) html+=sessionCard(list[i]);
+      html+='</div>';
+    }
+    box.innerHTML=html;
+  }
+
+  function sessionCard(s){
+    var tag = s.status==='completed'
+      ? '<span class="tag done">Completed</span>'
+      : '<span class="tag stopped">Stopped early</span>';
+    var h='<div class="sess">';
+    h+='<div class="sess-top">';
+    h+='<div class="sess-time">'+hhmm(s.startedAt)+'<span class="arrow">→</span>'+hhmm(s.endedAt)+'</div>';
+    h+=tag;
+    if(CLOUD && s.synced===false) h+='<span class="unsynced-dot" title="Saved on this device, not yet synced to the Sheet"></span>';
+    h+='<button class="del" data-del="'+s.id+'">Delete</button>';
+    h+='</div>';
+    h+='<div class="sess-plan">'+esc(s.plan)+'</div>';
+    if(s.notes && s.notes.trim()) h+='<div class="sess-notes">'+esc(s.notes)+'</div>';
+    if(s.status==='stopped' && s.stopReason){
+      h+='<div class="lbl">Stop reason</div><div class="reason">'+esc(s.stopReason)+'</div>';
+    }
+    h+='<div class="sess-foot">';
+    h+='<span>⏱ <b>'+dur(s.focusMs)+'</b> focus</span>';
+    h+='<span>🎯 planned '+s.plannedMinutes+'m</span>';
+    h+='<span>⏸ '+s.pauses.length+' break'+(s.pauses.length===1?'':'s')+(s.pauseMs?(' · '+dur(s.pauseMs)):'')+'</span>';
+    h+='</div></div>';
+    return h;
+  }
+
+  function renderTodayStats(){
+    var today=dateKey(nowMs()), focus=0, count=0, i;
+    for(i=0;i<sessions.length;i++) if(sessions[i].date===today){ focus+=sessions[i].focusMs; count++; }
+    el('todayStats').innerHTML = count
+      ? ('Today: <b>'+count+'</b> session'+(count===1?'':'s')+' · <b>'+dur(focus)+'</b> focused')
+      : 'No sessions logged today yet.';
+  }
+
+  // ---------- modal ----------
+  function openModal(id){ el(id).classList.add('show'); }
+  function closeModal(id){ el(id).classList.remove('show'); }
+
+  // ---------- sound + notifications ----------
+  function beep(){
+    try{
+      audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+      var t=audioCtx.currentTime;
+      [0,0.18].forEach(function(off){
+        var o=audioCtx.createOscillator(), g=audioCtx.createGain();
+        o.connect(g); g.connect(audioCtx.destination);
+        o.type='sine'; o.frequency.value=880;
+        g.gain.setValueAtTime(0.0001, t+off);
+        g.gain.exponentialRampToValueAtTime(0.35, t+off+0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t+off+0.4);
+        o.start(t+off); o.stop(t+off+0.42);
+      });
+    }catch(e){}
+  }
+  function requestNotify(){
+    try{ if('Notification' in window && Notification.permission==='default') Notification.requestPermission(); }catch(e){}
+  }
+  function notify(title, body){
+    try{ if('Notification' in window && Notification.permission==='granted') new Notification(title,{body:body}); }catch(e){}
+  }
+
+  // ---------- export ----------
+  function exportCSV(){
+    var head=['date','start','end','status','plannedMin','focusMin','breakMin','breaks','plan','notes','stopReason'];
+    var rows=[head], i, s;
+    for(i=0;i<sessions.length;i++){
+      s=sessions[i];
+      rows.push([
+        s.date, hhmm(s.startedAt), hhmm(s.endedAt), s.status,
+        s.plannedMinutes, (s.focusMs/60000).toFixed(1), (s.pauseMs/60000).toFixed(1),
+        s.pauses.length, s.plan, s.notes, s.stopReason
+      ]);
+    }
+    var csv=rows.map(function(r){return r.map(csvCell).join(',');}).join('\n');
+    var blob=new Blob([csv],{type:'text/csv'});
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='focus-sessions-'+dateKey(nowMs())+'.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+  function csvCell(v){ v=String(v==null?'':v); return /[",\n]/.test(v)?('"'+v.replace(/"/g,'""')+'"'):v; }
+
+  // ---------- selected minutes ----------
+  function selectedMinutes(){
+    var pills=document.querySelectorAll('#minutePills .pill');
+    for(var i=0;i<pills.length;i++) if(pills[i].classList.contains('active')) return +pills[i].getAttribute('data-min');
+    return 30;
+  }
+
+  // ============ wiring ============
+  function wire(){
+    // tabs
+    el('tab-timer').addEventListener('click', function(){ showView(active?'active':'home'); });
+    el('tab-report').addEventListener('click', function(){ showView('report'); });
+
+    // plan input enables start
+    var planInput=el('planInput');
+    planInput.addEventListener('input', function(){
+      el('startBtn').disabled = planInput.value.trim().length===0;
+    });
+
+    // minute pills
+    document.querySelectorAll('#minutePills .pill').forEach(function(p){
+      p.addEventListener('click', function(){
+        document.querySelectorAll('#minutePills .pill').forEach(function(x){x.classList.remove('active');});
+        p.classList.add('active');
+        settings.minutes=+p.getAttribute('data-min'); persist();
+      });
+    });
+    // restore saved minute choice
+    document.querySelectorAll('#minutePills .pill').forEach(function(p){
+      p.classList.toggle('active', +p.getAttribute('data-min')===settings.minutes);
+    });
+
+    // start
+    el('startBtn').addEventListener('click', function(){
+      var plan=planInput.value.trim();
+      if(!plan) return;
+      startSession(plan, selectedMinutes());
+      planInput.value=''; el('startBtn').disabled=true;
+    });
+
+    // notes autosave
+    el('notesInput').addEventListener('input', function(){
+      if(active){ active.notes=el('notesInput').value; persist(); }
+    });
+
+    // pause / resume
+    el('pauseBtn').addEventListener('click', function(){
+      if(!active) return;
+      if(active.paused) resumeSession(); else pauseSession();
+    });
+
+    // stop early
+    el('stopBtn').addEventListener('click', function(){
+      if(!active) return;
+      el('stopRemaining').textContent = mmss(remainingMs());
+      el('reasonInput').value=''; el('reasonErr').classList.remove('show');
+      openModal('stopOverlay');
+      setTimeout(function(){ el('reasonInput').focus(); },50);
+    });
+    el('cancelStop').addEventListener('click', function(){ closeModal('stopOverlay'); });
+    el('confirmStop').addEventListener('click', function(){
+      var reason=el('reasonInput').value.trim();
+      if(!reason){ el('reasonErr').classList.add('show'); return; }
+      finalize('stopped', reason);
+      closeModal('stopOverlay');
+      showView('report');
+    });
+
+    // done modal
+    el('doneReport').addEventListener('click', function(){ closeModal('doneOverlay'); showView('report'); });
+    el('doneAgain').addEventListener('click', function(){ closeModal('doneOverlay'); showView('home'); el('planInput').focus(); });
+
+    // report actions
+    el('exportBtn').addEventListener('click', exportCSV);
+    el('clearBtn').addEventListener('click', function(){
+      if(confirm('Delete ALL your saved sessions? This cannot be undone.')){
+        var ids=sessions.map(function(s){ return s.id; });
+        sessions=[]; persist(); renderReport(); renderTodayStats();
+        if(CLOUD && currentUser && ids.length){
+          setSync('busy','Clearing');
+          var chain=Promise.resolve();
+          ids.forEach(function(id){ chain=chain.then(function(){ return deleteRemote(id); }); });
+          chain.then(function(){ setSync('ok','Synced'); }).catch(function(){ setSync('off','Offline'); });
+        }
+      }
+    });
+    el('reportList').addEventListener('click', function(e){
+      var btn=e.target.closest('[data-del]'); if(!btn) return;
+      var id=btn.getAttribute('data-del');
+      if(confirm('Delete this session?')){
+        sessions=sessions.filter(function(s){return s.id!==id;});
+        persist(); renderReport(); renderTodayStats();
+        if(CLOUD && currentUser){ setSync('busy','Syncing'); deleteRemote(id).then(function(){ setSync('ok','Synced'); }).catch(function(){ setSync('off','Offline'); }); }
+      }
+    });
+
+    // user identity
+    el('userSave').addEventListener('click', function(){
+      var name=el('userInput').value.trim();
+      if(!name){ el('userErr').classList.add('show'); return; }
+      var isSwitch=!!currentUser;
+      closeModal('userOverlay');
+      applyUser(name, isSwitch);
+    });
+    el('userCancel').addEventListener('click', function(){ closeModal('userOverlay'); });
+    el('userInput').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); el('userSave').click(); } });
+    el('userPill').addEventListener('click', function(){ openUserModal(true); });
+
+    // keyboard: space toggles pause when active
+    document.addEventListener('keydown', function(e){
+      if(e.code==='Space' && active && el('view-active').classList.contains('active')
+         && document.activeElement.tagName!=='TEXTAREA' && !el('stopOverlay').classList.contains('show')){
+        e.preventDefault();
+        if(active.paused) resumeSession(); else pauseSession();
+      }
+    });
+  }
+
+  // ============ cloud sync ============
+  function setSync(state, label){
+    var p=el('syncPill'); if(!p) return;
+    p.className='sync'+(state?(' '+state):'');
+    p.textContent=label||'';
+    p.title = state==='ok' ? 'Saved to Google Sheet'
+      : state==='off' ? 'Offline — changes are saved on this device and will sync later'
+      : state==='busy' ? 'Syncing with Google Sheet…' : 'Local only (no cloud configured)';
+  }
+  function api(payload){
+    return fetch(WEBHOOK_URL, {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
+    }).then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); });
+  }
+  function toRow(s){
+    return {
+      id:s.id, user:currentUser, date:s.date,
+      start_time:hhmm(s.startedAt), end_time:hhmm(s.endedAt),
+      status:s.status,
+      planned_min:String(s.plannedMinutes),
+      focus_min:String(Math.round(s.focusMs/6000)/10),
+      break_min:String(Math.round((s.pauseMs||0)/6000)/10),
+      breaks:String((s.pauses||[]).length),
+      plan:s.plan||'', notes:s.notes||'', stop_reason:s.stopReason||'',
+      started_ms:String(s.startedAt), ended_ms:String(s.endedAt),
+      pauses_json:JSON.stringify(s.pauses||[])
+    };
+  }
+  function fromRow(r){
+    var pauses=[]; try{ pauses=JSON.parse(r.pauses_json||'[]')||[]; }catch(e){ pauses=[]; }
+    var startedAt=Number(r.started_ms)||0, endedAt=Number(r.ended_ms)||0, pauseMs=0, i;
+    for(i=0;i<pauses.length;i++) pauseMs+=(pauses[i].end-pauses[i].start);
+    var focusMs;
+    if(startedAt && endedAt){ focusMs=Math.max(0,(endedAt-startedAt)-pauseMs); }
+    else { focusMs=Math.round((Number(r.focus_min)||0)*60000); pauseMs=Math.round((Number(r.break_min)||0)*60000); }
+    return {
+      id:String(r.id), date:r.date, plan:r.plan||'', notes:r.notes||'',
+      status:r.status||'completed', stopReason:r.stop_reason||'',
+      plannedMinutes:Number(r.planned_min)||30,
+      startedAt:startedAt, endedAt:endedAt,
+      pauses:pauses, pauseMs:pauseMs, focusMs:focusMs, synced:true
+    };
+  }
+  function pushSave(rec){
+    if(!CLOUD || !currentUser) return;
+    setSync('busy','Saving');
+    api({action:'save', user:currentUser, sessions:[toRow(rec)]})
+      .then(function(){ rec.synced=true; persist(); setSync('ok','Synced'); renderReport(); })
+      .catch(function(){ setSync('off','Offline'); });
+  }
+  function deleteRemote(id){
+    if(!CLOUD || !currentUser) return Promise.resolve();
+    return api({action:'delete', user:currentUser, id:id});
+  }
+  function pullAll(){
+    if(!CLOUD){ setSync('','Local'); return; }
+    if(!currentUser) return;
+    setSync('busy','Syncing');
+    api({action:'list', user:currentUser}).then(function(rows){
+      var remote=(Array.isArray(rows)?rows:[]).filter(function(r){ return r && r.id; }).map(fromRow);
+      var rids={}; remote.forEach(function(s){ rids[s.id]=true; });
+      var pending=sessions.filter(function(s){ return s.synced!==true && !rids[s.id]; });
+      sessions=remote.concat(pending);
+      persist(); renderReport(); renderTodayStats();
+      setSync('ok','Synced');
+      pending.forEach(function(s){ pushSave(s); });
+    }).catch(function(){ setSync('off','Offline'); });
+  }
+
+  // ---- user identity ----
+  function renderUserPill(){
+    var up=el('userPill'); if(!up) return;
+    if(currentUser){ up.style.display='inline-flex'; up.textContent='@'+currentUser; }
+    else { up.style.display='none'; }
+  }
+  function openUserModal(allowCancel){
+    el('userInput').value=currentUser||'';
+    el('userErr').classList.remove('show');
+    el('userCancel').style.display=allowCancel?'block':'none';
+    openModal('userOverlay');
+    setTimeout(function(){ el('userInput').focus(); }, 50);
+  }
+  function applyUser(name, isSwitch){
+    var prev=currentUser;
+    currentUser=name;
+    localStorage.setItem(USER_KEY, currentUser);
+    renderUserPill();
+    if(isSwitch && name!==prev){
+      sessions=[]; persist(); renderReport(); renderTodayStats();   // load the new person's data instead
+    }
+    pullAll();
+  }
+  function ensureUser(){
+    renderUserPill();
+    if(CLOUD && !currentUser){ openUserModal(false); }
+    else { pullAll(); }
+  }
+
+  // ============ init ============
+  function init(){
+    wire();
+    setSync(CLOUD?'busy':'', CLOUD?'Syncing':'Local');
+    renderTodayStats();
+    renderReport();
+    if(active){
+      if(!active.paused && (active.endsAt - nowMs())<=0){
+        // timer elapsed while the app was closed → save as completed at its end time
+        finalize('completed','', active.endsAt);
+        showView('home');
+      }else{
+        showView('active');
+        renderActive();
+        startTick();
+      }
+    }else{
+      showView('home');
+    }
+    ensureUser();
+  }
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>
+</body>
+</html>
