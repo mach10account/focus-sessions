@@ -71,10 +71,12 @@
   .card + .card{margin-top:16px}
 
   label.field{display:block;font-size:13px;color:var(--muted);font-weight:600;margin-bottom:8px;letter-spacing:.2px}
-  textarea,input[type=text],input[type=number]{
+  textarea,input[type=text],input[type=number],input[type=datetime-local],select{
     width:100%;background:var(--bg-soft);border:1px solid var(--line);border-radius:12px;
     color:var(--text);font-size:15px;padding:13px 14px;font-family:inherit;resize:vertical;outline:none;transition:.15s;
   }
+  select{cursor:pointer;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%239aa4b5' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:34px}
+  input[type=datetime-local]{color-scheme:dark}
   textarea:focus,input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(99,102,241,.18)}
   .field .opt{color:var(--faint);font-weight:500;text-transform:none;letter-spacing:0}
   textarea::placeholder{color:var(--faint)}
@@ -170,6 +172,34 @@
   .dist-empty{color:var(--faint);font-size:13px;padding:2px}
   .muted{color:var(--muted);font-size:13px}
 
+  /* ---- tasks ---- */
+  .task-group{margin-top:22px}
+  .task-group:first-child{margin-top:6px}
+  .task-group-title{font-size:12px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--faint);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .task-group-title .cnt{color:var(--faint);font-weight:600}
+  .task-group.overdue .task-group-title{color:var(--red)}
+  .task{display:flex;align-items:flex-start;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:9px}
+  .task.done{opacity:.55}
+  .chk{flex:0 0 auto;width:22px;height:22px;border-radius:7px;border:2px solid var(--faint);background:transparent;cursor:pointer;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:.15s}
+  .chk:hover{border-color:var(--accent)}
+  .chk.on{background:var(--green);border-color:var(--green)}
+  .chk.on::after{content:"✓";color:#fff;font-size:14px;font-weight:800}
+  .task-main{flex:1;min-width:0}
+  .task-title{font-size:15px;font-weight:600;line-height:1.4}
+  .task.done .task-title{text-decoration:line-through}
+  .task-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:7px;font-size:12.5px}
+  .pri{font-size:11px;font-weight:700;letter-spacing:.4px;padding:3px 9px;border-radius:20px;text-transform:uppercase}
+  .pri.high{background:rgba(239,68,68,.16);color:var(--red)}
+  .pri.med{background:rgba(245,158,11,.16);color:var(--amber)}
+  .pri.low{background:rgba(99,102,241,.16);color:var(--accent-2)}
+  .due{display:inline-flex;align-items:center;gap:5px;color:var(--muted);font-weight:600}
+  .due.overdue{color:var(--red)}
+  .due.soon{color:var(--amber)}
+  .proj-chip{display:inline-flex;align-items:center;gap:5px;color:var(--accent-2);background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.25);padding:2px 9px;border-radius:20px;font-weight:600;font-size:11.5px}
+  .task-note{color:var(--muted);font-size:13px;margin-top:6px;line-height:1.45;white-space:pre-wrap}
+  .task-edit{flex:0 0 auto;background:transparent;border:none;color:var(--faint);cursor:pointer;font-size:12.5px;padding:2px 4px;margin-top:1px}
+  .task-edit:hover{color:var(--accent-2)}
+
   .empty{text-align:center;color:var(--muted);padding:48px 20px}
   .empty .big{font-size:40px;margin-bottom:10px}
 
@@ -192,6 +222,7 @@
     <div class="brand"><span class="dot"></span> Focus Sessions<span id="syncPill" class="sync" title="Google Sheet sync">Cloud</span><span id="userPill" class="user-pill" style="display:none" title="Switch user"></span></div>
     <nav class="tabs">
       <button id="tab-timer" class="active" data-view="timer">Timer</button>
+      <button id="tab-tasks" data-view="tasks">Tasks</button>
       <button id="tab-report" data-view="report">Report</button>
     </nav>
   </header>
@@ -201,6 +232,13 @@
     <div class="card">
       <label class="field" for="planInput">What will you do this session?</label>
       <textarea id="planInput" rows="3" placeholder="e.g. Draft the proposal intro and outline the next 3 sections…"></textarea>
+
+      <label class="field" style="margin-top:18px">Project</label>
+      <div class="row" style="gap:8px">
+        <select id="projectSelect" style="flex:1"><option value="">No project</option></select>
+        <button id="projectNew" class="btn ghost" type="button" style="padding:11px 16px">+ New</button>
+        <button id="projectManage" class="btn ghost" type="button" style="padding:11px 14px" title="Manage projects">⚙</button>
+      </div>
 
       <label class="field" style="margin-top:18px">Session length</label>
       <div class="pills" id="minutePills">
@@ -277,6 +315,15 @@
     </div>
     <div id="reportList"></div>
   </section>
+
+  <!-- ============ TASKS ============ -->
+  <section id="view-tasks" class="view">
+    <div class="report-head">
+      <h2 style="margin:0;font-size:20px">Tasks</h2>
+      <button id="taskNew" class="btn primary" style="padding:10px 18px">+ New task</button>
+    </div>
+    <div id="taskList"></div>
+  </section>
 </div>
 
 <!-- ============ STOP MODAL ============ -->
@@ -346,6 +393,59 @@
       <button id="editCancel" class="btn ghost block">Cancel</button>
       <button id="editSave" class="btn primary block">Save changes</button>
     </div>
+  </div>
+</div>
+
+<!-- ============ TASK EDITOR MODAL ============ -->
+<div class="overlay" id="taskOverlay">
+  <div class="modal" style="max-width:520px">
+    <h3 id="taskModalTitle">New task</h3>
+    <label class="field" for="taskTitle">Task</label>
+    <input id="taskTitle" type="text" placeholder="What needs doing?" autocomplete="off" />
+    <div class="err" id="taskErr">Please enter a task.</div>
+    <div class="row wrap" style="margin-top:12px;gap:12px">
+      <div style="flex:1;min-width:140px">
+        <label class="field" for="taskPriority">Priority</label>
+        <select id="taskPriority"><option value="high">🔴 High</option><option value="med" selected>🟠 Medium</option><option value="low">🔵 Low</option></select>
+      </div>
+      <div style="flex:1;min-width:140px">
+        <label class="field" for="taskProject">Project</label>
+        <select id="taskProject"><option value="">No project</option></select>
+      </div>
+    </div>
+    <label class="field" for="taskDue" style="margin-top:12px">Due <span class="opt">— optional date &amp; time (triggers a reminder)</span></label>
+    <input id="taskDue" type="datetime-local" />
+    <label class="field" for="taskNotes" style="margin-top:12px">Notes</label>
+    <textarea id="taskNotes" rows="2"></textarea>
+    <div class="row" style="margin-top:20px">
+      <button id="taskDeleteBtn" class="btn danger" style="display:none;padding:14px 18px">Delete</button>
+      <button id="taskCancel" class="btn ghost block">Cancel</button>
+      <button id="taskSave" class="btn primary block">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ PROJECTS MANAGER MODAL ============ -->
+<div class="overlay" id="projOverlay">
+  <div class="modal">
+    <h3>Projects</h3>
+    <p class="muted">Tag your focus sessions and tasks by project.</p>
+    <div id="projManageList" class="dist-list" style="margin-top:8px"></div>
+    <div class="row wrap" style="margin-top:10px">
+      <input id="projNewName" type="text" placeholder="New project name" style="flex:1;min-width:150px" autocomplete="off" />
+      <button id="projAdd" class="btn ghost" type="button" style="padding:11px 16px">+ Add</button>
+    </div>
+    <div class="row" style="margin-top:18px"><button id="projClose" class="btn primary block">Done</button></div>
+  </div>
+</div>
+
+<!-- ============ DUE-TASK REMINDER POP-UP ============ -->
+<div class="overlay" id="dueOverlay">
+  <div class="modal">
+    <div style="font-size:42px;text-align:center;margin-bottom:4px">⏰</div>
+    <h3 style="text-align:center;margin-bottom:6px">Tasks due</h3>
+    <div id="dueList" class="dist-list" style="margin-top:6px"></div>
+    <div class="row" style="margin-top:18px"><button id="dueClose" class="btn primary block">Got it</button></div>
   </div>
 </div>
 
@@ -431,8 +531,10 @@
 
   // ---------- session lifecycle ----------
   function startSession(plan, minutes){
+    var proj = el('projectSelect') ? el('projectSelect').value : '';
+    settings.project = proj;
     active = {
-      id:uid(), plan:plan, notes:'', plannedMinutes:minutes,
+      id:uid(), plan:plan, notes:'', plannedMinutes:minutes, project:proj,
       startedAt:nowMs(), endsAt:nowMs()+minutes*60000, remainingMs:minutes*60000,
       paused:false, pauses:[], currentPauseStart:null,
       distractions:[]
@@ -474,7 +576,8 @@
     var focusMs = Math.max(0, (endedAt - active.startedAt) - pauseMs);
     var rec={
       id:active.id, date:dateKey(active.startedAt), plan:active.plan, notes:active.notes,
-      plannedMinutes:active.plannedMinutes, startedAt:active.startedAt, endedAt:endedAt,
+      plannedMinutes:active.plannedMinutes, project:active.project||'',
+      startedAt:active.startedAt, endedAt:endedAt,
       status:status, stopReason:reason||'', pauses:active.pauses.slice(),
       pauseMs:pauseMs, focusMs:focusMs,
       distractions:(active.distractions||[]).slice(),
@@ -509,12 +612,14 @@
 
   // ---------- rendering ----------
   function showView(name){
-    var views=['home','active','report'];
+    var views=['home','active','tasks','report'];
     for(var i=0;i<views.length;i++){
       el('view-'+views[i]).classList.toggle('active', views[i]===name);
     }
-    el('tab-timer').classList.toggle('active', name!=='report');
+    el('tab-timer').classList.toggle('active', name==='home'||name==='active');
+    el('tab-tasks').classList.toggle('active', name==='tasks');
     el('tab-report').classList.toggle('active', name==='report');
+    if(name==='tasks'){ renderTasks(); checkDueTasks(false); }
   }
 
   function renderActive(){
@@ -606,6 +711,7 @@
     h+='<span class="card-actions"><button class="edit" data-edit="'+s.id+'">Edit</button><button class="del" data-del="'+s.id+'">Delete</button></span>';
     h+='</div>';
     h+='<div class="sess-plan">'+esc(s.plan)+'</div>';
+    if(s.project) h+='<div style="margin:2px 0 4px"><span class="proj-chip">▦ '+esc(s.project)+'</span></div>';
     if(s.notes && s.notes.trim()) h+='<div class="sess-notes">'+esc(s.notes)+'</div>';
     if(s.status==='stopped' && s.stopReason){
       h+='<div class="lbl">Stop reason</div><div class="reason">'+esc(s.stopReason)+'</div>';
@@ -860,6 +966,37 @@
     el('editSave').addEventListener('click', saveEdit);
     el('editCancel').addEventListener('click', function(){ editDraft=null; closeModal('editOverlay'); });
 
+    // tasks
+    el('tab-tasks').addEventListener('click', function(){ showView('tasks'); });
+    el('taskNew').addEventListener('click', function(){ openTask(null); });
+    el('taskList').addEventListener('click', function(e){
+      var tg=e.target.closest('[data-toggle]'); if(tg){ toggleTaskDone(tg.getAttribute('data-toggle')); return; }
+      var te=e.target.closest('[data-tedit]'); if(te){ openTask(te.getAttribute('data-tedit')); return; }
+    });
+    el('taskSave').addEventListener('click', saveTask);
+    el('taskCancel').addEventListener('click', function(){ taskEditId=null; closeModal('taskOverlay'); });
+    el('taskTitle').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); saveTask(); } });
+    el('taskDeleteBtn').addEventListener('click', function(){
+      if(taskEditId && confirm('Delete this task?')){ deleteTask(taskEditId); taskEditId=null; closeModal('taskOverlay'); }
+    });
+    el('dueClose').addEventListener('click', function(){ closeModal('dueOverlay'); });
+
+    // projects
+    el('projectSelect').addEventListener('change', function(){ settings.project=el('projectSelect').value; persist(); });
+    el('projectNew').addEventListener('click', function(){
+      var n=prompt('New project name:'); if(n && n.trim()){ var p=addProject(n); if(p){ settings.project=p.name; persist(); renderProjectOptions(); } }
+    });
+    el('projectManage').addEventListener('click', function(){ renderProjManage(); openModal('projOverlay'); });
+    el('projAdd').addEventListener('click', function(){
+      var n=el('projNewName').value; if(n && n.trim()){ addProject(n); el('projNewName').value=''; el('projNewName').focus(); }
+    });
+    el('projNewName').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); el('projAdd').click(); } });
+    el('projManageList').addEventListener('click', function(e){
+      var b=e.target.closest('[data-proj]'); if(!b) return;
+      if(confirm('Delete this project? (existing sessions/tasks keep their label)')) removeProject(b.getAttribute('data-proj'));
+    });
+    el('projClose').addEventListener('click', function(){ closeModal('projOverlay'); renderProjectOptions(); });
+
     // keyboard: space toggles pause when active — but NOT while typing in a field or with a modal open
     document.addEventListener('keydown', function(e){
       if(e.code!=='Space') return;
@@ -886,6 +1023,13 @@
       method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
     }).then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); });
   }
+  // Serialize ALL writes (Sheet appends collide under concurrency → lost rows). Reads stay parallel.
+  var _writeQueue=Promise.resolve();
+  function enqueueWrite(fn){
+    var run=_writeQueue.then(fn, fn);
+    _writeQueue=run.then(function(){}, function(){});
+    return run;
+  }
   function toRow(s){
     return {
       id:s.id, user:currentUser, date:s.date,
@@ -898,6 +1042,7 @@
       lost_min:String(distTotal(s.distractions)),
       lost_note:(s.distractions||[]).filter(function(d){return d.note&&String(d.note).trim();}).map(function(d){return (Number(d.min)||0)+'m '+d.note;}).join('; '),
       distractions_json:JSON.stringify(s.distractions||[]),
+      project:s.project||'',
       plan:s.plan||'', notes:s.notes||'', stop_reason:s.stopReason||'',
       started_ms:String(s.startedAt), ended_ms:String(s.endedAt),
       pauses_json:JSON.stringify(s.pauses||[])
@@ -919,20 +1064,20 @@
       plannedMinutes:Number(r.planned_min)||30,
       startedAt:startedAt, endedAt:endedAt,
       pauses:pauses, pauseMs:pauseMs, focusMs:focusMs,
-      distractions:distractions,
+      distractions:distractions, project:String(r.project||''),
       synced:true
     };
   }
   function pushSave(rec){
     if(!CLOUD || !currentUser) return;
     setSync('busy','Saving');
-    api({action:'save', user:currentUser, sessions:[toRow(rec)]})
+    enqueueWrite(function(){ return api({action:'save', user:currentUser, sessions:[toRow(rec)]}); })
       .then(function(){ rec.synced=true; persist(); setSync('ok','Synced'); renderReport(); })
       .catch(function(){ setSync('off','Offline'); });
   }
   function deleteRemote(id){
     if(!CLOUD || !currentUser) return Promise.resolve();
-    return api({action:'delete', user:currentUser, id:id});
+    return enqueueWrite(function(){ return api({action:'delete', user:currentUser, id:id}); });
   }
   function pullAll(){
     if(!CLOUD){ setSync('','Local'); return; }
@@ -968,14 +1113,17 @@
     localStorage.setItem(USER_KEY, JSON.stringify(currentUser));
     renderUserPill();
     if(isSwitch && name!==prev){
-      sessions=[]; persist(); renderReport(); renderTodayStats();   // load the new person's data instead
+      sessions=[]; tasks=[]; projects=[]; notifiedIds={};
+      persist(); persistTP();
+      renderReport(); renderTodayStats(); renderTasks(); renderProjectOptions(); renderProjManage();
     }
-    pullAll();
+    pullAll(); syncTP();
   }
   function ensureUser(){
     renderUserPill();
+    renderProjectOptions(); renderProjManage(); renderTasks();
     if(CLOUD && !currentUser){ openUserModal(false); }
-    else { pullAll(); }
+    else { pullAll(); syncTP(); }
   }
 
   // ---- edit a saved session ----
@@ -1016,6 +1164,205 @@
     editDraft=null; closeModal('editOverlay');
   }
 
+  // ================= TASKS & PROJECTS (synced via focus-tasks webhook) =================
+  var TP_URL='https://n8n.srv1035791.hstgr.cloud/webhook/focus-tasks';
+  var TASKS_KEY='fs_tasks_v1', PROJ_KEY='fs_projects_v1';
+  var tasks=load(TASKS_KEY, []);
+  var projects=load(PROJ_KEY, []);
+  var notifiedIds={};
+  function persistTP(){ localStorage.setItem(TASKS_KEY, JSON.stringify(tasks)); localStorage.setItem(PROJ_KEY, JSON.stringify(projects)); }
+  function tpApi(payload){ return fetch(TP_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }); }
+
+  // ---- projects ----
+  function projToRow(p){ return { id:p.id, user:currentUser, name:p.name, created_ms:String(p.createdMs||0) }; }
+  function projFromRow(r){ return { id:String(r.id), name:String(r.name||''), createdMs:Number(r.created_ms)||0, synced:true }; }
+  function pushProject(p){ if(!CLOUD||!currentUser) return; enqueueWrite(function(){ return tpApi({action:'save',entity:'project',user:currentUser,items:[projToRow(p)]}); }).then(function(){ p.synced=true; persistTP(); }).catch(function(){}); }
+  function addProject(name){
+    name=(name||'').trim(); if(!name) return null;
+    for(var i=0;i<projects.length;i++) if(projects[i].name.toLowerCase()===name.toLowerCase()) return projects[i];
+    var p={ id:uid(), name:name, createdMs:nowMs(), synced:false };
+    projects.push(p); persistTP(); renderProjectOptions(); renderProjManage(); pushProject(p);
+    return p;
+  }
+  function removeProject(id){
+    projects=projects.filter(function(p){return p.id!==id;});
+    persistTP(); renderProjectOptions(); renderProjManage();
+    if(CLOUD&&currentUser) enqueueWrite(function(){ return tpApi({action:'delete',entity:'project',user:currentUser,id:id}); }).catch(function(){});
+  }
+  function pullProjects(){
+    if(!CLOUD||!currentUser) return;
+    tpApi({action:'list',entity:'project',user:currentUser}).then(function(rows){
+      var remote=(Array.isArray(rows)?rows:[]).filter(function(r){return r&&r.id;}).map(projFromRow);
+      var rids={}; remote.forEach(function(p){rids[p.id]=true;});
+      var pending=projects.filter(function(p){return p.synced!==true && !rids[p.id];});
+      projects=remote.concat(pending); persistTP(); renderProjectOptions(); renderProjManage();
+      pending.forEach(pushProject);
+    }).catch(function(){});
+  }
+  function renderProjectOptions(){
+    var sorted=projects.slice().sort(function(a,b){return a.name.toLowerCase()<b.name.toLowerCase()?-1:1;});
+    [['projectSelect', settings.project||''], ['taskProject', null]].forEach(function(pair){
+      var sel=el(pair[0]); if(!sel) return;
+      var keep = pair[1]!==null ? pair[1] : sel.value;
+      var h='<option value="">No project</option>';
+      sorted.forEach(function(p){ h+='<option value="'+esc(p.name)+'">'+esc(p.name)+'</option>'; });
+      sel.innerHTML=h; sel.value=keep||'';
+    });
+  }
+  function renderProjManage(){
+    var box=el('projManageList'); if(!box) return;
+    var sorted=projects.slice().sort(function(a,b){return a.name.toLowerCase()<b.name.toLowerCase()?-1:1;});
+    if(!sorted.length){ box.innerHTML='<div class="dist-empty">No projects yet.</div>'; return; }
+    var h='';
+    sorted.forEach(function(p){ h+='<div class="dist-item"><span style="color:var(--text)">'+esc(p.name)+'</span><button class="dist-x" data-proj="'+p.id+'" title="Delete">×</button></div>'; });
+    box.innerHTML=h;
+  }
+
+  // ---- tasks ----
+  function taskToRow(t){ return { id:t.id, user:currentUser, title:t.title, priority:t.priority, due_ms:String(t.dueMs||0), due_text:t.dueText||'', done:t.done?'1':'0', notes:t.notes||'', project:t.project||'', created_ms:String(t.createdMs||0), reminded:t.reminded?'1':'0' }; }
+  function taskFromRow(r){ return { id:String(r.id), title:String(r.title||''), priority:String(r.priority||'med'), dueMs:Number(r.due_ms)||0, dueText:String(r.due_text||''), done:String(r.done)==='1', notes:String(r.notes||''), project:String(r.project||''), createdMs:Number(r.created_ms)||0, reminded:String(r.reminded)==='1', synced:true }; }
+  function pushTask(t){ if(!CLOUD||!currentUser) return; enqueueWrite(function(){ return tpApi({action:'save',entity:'task',user:currentUser,items:[taskToRow(t)]}); }).then(function(){ t.synced=true; persistTP(); renderTasks(); }).catch(function(){}); }
+  function findTask(id){ for(var i=0;i<tasks.length;i++) if(tasks[i].id===id) return tasks[i]; return null; }
+  function deleteTask(id){
+    tasks=tasks.filter(function(t){return t.id!==id;});
+    persistTP(); renderTasks();
+    if(CLOUD&&currentUser) enqueueWrite(function(){ return tpApi({action:'delete',entity:'task',user:currentUser,id:id}); }).catch(function(){});
+  }
+  function pullTasks(){
+    if(!CLOUD||!currentUser) return;
+    tpApi({action:'list',entity:'task',user:currentUser}).then(function(rows){
+      var remote=(Array.isArray(rows)?rows:[]).filter(function(r){return r&&r.id;}).map(taskFromRow);
+      var rids={}; remote.forEach(function(t){rids[t.id]=true;});
+      var pending=tasks.filter(function(t){return t.synced!==true && !rids[t.id];});
+      tasks=remote.concat(pending); persistTP(); renderTasks();
+      pending.forEach(pushTask);
+      checkDueTasks(true);
+    }).catch(function(){});
+  }
+
+  // ---- task rendering ----
+  function startOfDay(ms){ var d=new Date(ms); d.setHours(0,0,0,0); return d.getTime(); }
+  function endOfDay(ms){ var d=new Date(ms); d.setHours(23,59,59,999); return d.getTime(); }
+  function priRank(p){ return p==='high'?0:(p==='med'?1:2); }
+  function dueLabel(t){
+    if(!t.dueMs) return '';
+    var d=new Date(t.dueMs), now=nowMs();
+    var timeStr=pad(d.getHours())+':'+pad(d.getMinutes());
+    var dateStr;
+    if(startOfDay(t.dueMs)===startOfDay(now)) dateStr='Today';
+    else if(startOfDay(t.dueMs)===startOfDay(now+86400000)) dateStr='Tomorrow';
+    else dateStr=d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    return dateStr+' '+timeStr;
+  }
+  function taskBucket(t){
+    if(t.done) return 'done';
+    if(!t.dueMs) return 'nodate';
+    var now=nowMs();
+    if(t.dueMs<now) return 'overdue';
+    if(t.dueMs<=endOfDay(now)) return 'today';
+    return 'upcoming';
+  }
+  function renderTasks(){
+    var box=el('taskList'); if(!box) return;
+    if(!tasks.length){ box.innerHTML='<div class="empty"><div class="big">✅</div><div>No tasks yet.<br>Add one with “+ New task”.</div></div>'; return; }
+    var groups={overdue:[],today:[],upcoming:[],nodate:[],done:[]};
+    tasks.forEach(function(t){ groups[taskBucket(t)].push(t); });
+    var order=[['overdue','Overdue'],['today','Today'],['upcoming','Upcoming'],['nodate','No date'],['done','Done']];
+    var sortFn=function(a,b){
+      if(a.dueMs&&b.dueMs&&a.dueMs!==b.dueMs) return a.dueMs-b.dueMs;
+      if(a.dueMs&&!b.dueMs) return -1; if(!a.dueMs&&b.dueMs) return 1;
+      if(priRank(a.priority)!==priRank(b.priority)) return priRank(a.priority)-priRank(b.priority);
+      return (b.createdMs||0)-(a.createdMs||0);
+    };
+    var h='';
+    order.forEach(function(g){
+      var list=groups[g[0]]; if(!list.length) return;
+      list.sort(g[0]==='done'?function(a,b){return (b.createdMs||0)-(a.createdMs||0);}:sortFn);
+      h+='<div class="task-group'+(g[0]==='overdue'?' overdue':'')+'">';
+      h+='<div class="task-group-title">'+g[1]+' <span class="cnt">'+list.length+'</span></div>';
+      list.forEach(function(t){ h+=taskCard(t); });
+      h+='</div>';
+    });
+    box.innerHTML=h;
+  }
+  function taskCard(t){
+    var now=nowMs();
+    var dueCls = !t.dueMs?'':(t.dueMs<now?'overdue':(t.dueMs<=now+3600000*6?'soon':''));
+    var h='<div class="task'+(t.done?' done':'')+'">';
+    h+='<button class="chk'+(t.done?' on':'')+'" data-toggle="'+t.id+'" title="Mark done"></button>';
+    h+='<div class="task-main">';
+    h+='<div class="task-title">'+esc(t.title)+'</div>';
+    h+='<div class="task-meta">';
+    h+='<span class="pri '+(t.priority||'med')+'">'+(t.priority==='high'?'High':(t.priority==='low'?'Low':'Medium'))+'</span>';
+    if(t.dueMs) h+='<span class="due '+dueCls+'">🕒 '+esc(dueLabel(t))+'</span>';
+    if(t.project) h+='<span class="proj-chip">▦ '+esc(t.project)+'</span>';
+    h+='</div>';
+    if(t.notes&&t.notes.trim()) h+='<div class="task-note">'+esc(t.notes)+'</div>';
+    h+='</div>';
+    h+='<button class="task-edit" data-tedit="'+t.id+'">Edit</button>';
+    h+='</div>';
+    return h;
+  }
+
+  // ---- task editor ----
+  var taskEditId=null;
+  function localDT(ms){ var d=new Date(ms); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes()); }
+  function openTask(id){
+    taskEditId=id||null;
+    renderProjectOptions();
+    el('taskErr').classList.remove('show');
+    var t = id?findTask(id):null;
+    el('taskModalTitle').textContent = t?'Edit task':'New task';
+    el('taskTitle').value = t?t.title:'';
+    el('taskPriority').value = t?(t.priority||'med'):'med';
+    el('taskProject').value = t?(t.project||''):(settings.project||'');
+    el('taskDue').value = (t&&t.dueMs)?localDT(t.dueMs):'';
+    el('taskNotes').value = t?(t.notes||''):'';
+    el('taskDeleteBtn').style.display = t?'inline-flex':'none';
+    openModal('taskOverlay');
+    setTimeout(function(){ el('taskTitle').focus(); },50);
+  }
+  function saveTask(){
+    var title=el('taskTitle').value.trim();
+    if(!title){ el('taskErr').classList.add('show'); return; }
+    var dv=el('taskDue').value, dueMs=0, dueText='';
+    if(dv){ var d=new Date(dv); if(!isNaN(d.getTime())){ dueMs=d.getTime(); dueText=dv.replace('T',' '); } }
+    var t = taskEditId?findTask(taskEditId):null;
+    if(t){
+      t.title=title; t.priority=el('taskPriority').value; t.project=el('taskProject').value; t.notes=el('taskNotes').value;
+      if(t.dueMs!==dueMs) t.reminded=false;
+      t.dueMs=dueMs; t.dueText=dueText; t.synced=false;
+    } else {
+      t={ id:uid(), title:title, priority:el('taskPriority').value, dueMs:dueMs, dueText:dueText, done:false, notes:el('taskNotes').value, project:el('taskProject').value, createdMs:nowMs(), reminded:false, synced:false };
+      tasks.push(t);
+    }
+    if(dueMs) requestNotify();
+    persistTP(); renderTasks(); closeModal('taskOverlay'); pushTask(t); taskEditId=null;
+  }
+  function toggleTaskDone(id){
+    var t=findTask(id); if(!t) return;
+    t.done=!t.done; t.synced=false; persistTP(); renderTasks(); pushTask(t);
+  }
+
+  // ---- due reminders (in-app) ----
+  function checkDueTasks(popup){
+    var now=nowMs();
+    var due=tasks.filter(function(t){ return !t.done && t.dueMs && t.dueMs<=now; });
+    due.forEach(function(t){
+      if(!notifiedIds[t.id]){ notifiedIds[t.id]=true; notify('⏰ Task due: '+t.title, (t.project?('['+t.project+'] '):'')+(t.dueText||'')); }
+    });
+    if(popup && due.length) showDuePopup(due);
+  }
+  function showDuePopup(list){
+    var h='';
+    list.slice().sort(function(a,b){return (a.dueMs||0)-(b.dueMs||0);}).forEach(function(t){
+      h+='<div class="dist-item"><span style="color:var(--text)"><span class="pri '+(t.priority||'med')+'" style="margin-right:8px">'+(t.priority==='high'?'High':(t.priority==='low'?'Low':'Med'))+'</span>'+esc(t.title)+(t.project?(' <span class="ln">· '+esc(t.project)+'</span>'):'')+'</span></div>';
+    });
+    el('dueList').innerHTML=h;
+    openModal('dueOverlay');
+  }
+  function syncTP(){ pullProjects(); pullTasks(); }
+
   // ============ init ============
   function init(){
     wire();
@@ -1035,6 +1382,7 @@
     }else{
       showView('home');
     }
+    setInterval(function(){ checkDueTasks(false); }, 30000);   // in-app due-task notifications while open
     ensureUser();
   }
 
