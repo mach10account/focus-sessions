@@ -198,6 +198,10 @@
         <div class="pill" data-min="45">45 min</div>
         <div class="pill" data-min="50">50 min</div>
         <div class="pill" data-min="60">60 min</div>
+        <div class="pill" data-min="custom">Custom</div>
+      </div>
+      <div id="customWrap" style="display:none;margin-top:10px">
+        <input id="customMin" type="number" min="1" max="600" placeholder="Custom length in minutes (1–600)…" />
       </div>
 
       <button id="startBtn" class="btn primary block lg" style="margin-top:22px" disabled>▶ Start session</button>
@@ -616,10 +620,26 @@
   function csvCell(v){ v=String(v==null?'':v); return /[",\n]/.test(v)?('"'+v.replace(/"/g,'""')+'"'):v; }
 
   // ---------- selected minutes ----------
+  function customSelected(){
+    var c=document.querySelector('#minutePills .pill[data-min="custom"]');
+    return !!(c && c.classList.contains('active'));
+  }
   function selectedMinutes(){
+    if(customSelected()){
+      var v=parseInt((el('customMin').value||'').trim(),10);
+      if(isNaN(v)||v<1) return 0;            // 0 = invalid (blocks Start)
+      return Math.min(v, 600);
+    }
     var pills=document.querySelectorAll('#minutePills .pill');
-    for(var i=0;i<pills.length;i++) if(pills[i].classList.contains('active')) return +pills[i].getAttribute('data-min');
+    for(var i=0;i<pills.length;i++){
+      var p=pills[i];
+      if(p.classList.contains('active') && p.getAttribute('data-min')!=='custom') return +p.getAttribute('data-min');
+    }
     return 30;
+  }
+  function updateStartBtn(){
+    var planOk=el('planInput').value.trim().length>0;
+    el('startBtn').disabled = !(planOk && selectedMinutes()>=1);
   }
 
   // ============ wiring ============
@@ -630,29 +650,53 @@
 
     // plan input enables start
     var planInput=el('planInput');
-    planInput.addEventListener('input', function(){
-      el('startBtn').disabled = planInput.value.trim().length===0;
-    });
+    planInput.addEventListener('input', updateStartBtn);
 
-    // minute pills
+    // minute pills (incl. Custom)
     document.querySelectorAll('#minutePills .pill').forEach(function(p){
       p.addEventListener('click', function(){
         document.querySelectorAll('#minutePills .pill').forEach(function(x){x.classList.remove('active');});
         p.classList.add('active');
-        settings.minutes=+p.getAttribute('data-min'); persist();
+        var dm=p.getAttribute('data-min');
+        if(dm==='custom'){
+          el('customWrap').style.display='block';
+          setTimeout(function(){ el('customMin').focus(); }, 30);
+          var cv=parseInt(el('customMin').value,10);
+          if(!isNaN(cv)&&cv>=1) settings.minutes=Math.min(cv,600);
+        } else {
+          el('customWrap').style.display='none';
+          settings.minutes=+dm;
+        }
+        persist(); updateStartBtn();
       });
     });
-    // restore saved minute choice
-    document.querySelectorAll('#minutePills .pill').forEach(function(p){
-      p.classList.toggle('active', +p.getAttribute('data-min')===settings.minutes);
+    el('customMin').addEventListener('input', function(){
+      var v=parseInt(el('customMin').value,10);
+      if(!isNaN(v)&&v>=1){ settings.minutes=Math.min(v,600); persist(); }
+      updateStartBtn();
     });
+
+    // restore saved minute choice (preset or custom)
+    (function(){
+      var presets={25:1,30:1,45:1,50:1,60:1};
+      document.querySelectorAll('#minutePills .pill').forEach(function(x){ x.classList.remove('active'); });
+      if(presets[settings.minutes]){
+        document.querySelector('#minutePills .pill[data-min="'+settings.minutes+'"]').classList.add('active');
+        el('customWrap').style.display='none';
+      } else {
+        document.querySelector('#minutePills .pill[data-min="custom"]').classList.add('active');
+        el('customMin').value=settings.minutes;
+        el('customWrap').style.display='block';
+      }
+    })();
 
     // start
     el('startBtn').addEventListener('click', function(){
       var plan=planInput.value.trim();
-      if(!plan) return;
-      startSession(plan, selectedMinutes());
-      planInput.value=''; el('startBtn').disabled=true;
+      var mins=selectedMinutes();
+      if(!plan || mins<1) return;
+      startSession(plan, mins);
+      planInput.value=''; updateStartBtn();
     });
 
     // notes autosave
