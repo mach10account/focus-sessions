@@ -156,8 +156,19 @@
   .lost{color:var(--amber);font-size:13px;margin-top:10px;display:flex;align-items:flex-start;gap:6px;font-weight:600;line-height:1.45}
   .lost .ln{color:var(--muted);font-weight:500}
   .lbl{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--faint);font-weight:700;margin:10px 0 2px}
-  .del{margin-left:auto;background:transparent;border:none;color:var(--faint);cursor:pointer;font-size:12.5px;padding:2px 4px}
+  .card-actions{margin-left:auto;display:flex;gap:12px;align-items:center}
+  .del,.edit{background:transparent;border:none;color:var(--faint);cursor:pointer;font-size:12.5px;padding:2px 4px}
   .del:hover{color:var(--red)}
+  .edit:hover{color:var(--accent-2)}
+  .dist-list{display:flex;flex-direction:column;gap:6px}
+  .dist-list.ro{margin-top:6px}
+  .dist-item{display:flex;align-items:center;gap:8px;background:var(--bg-soft);border:1px solid var(--line);border-radius:10px;padding:8px 11px;font-size:13.5px}
+  .dist-item>span{flex:1;color:var(--amber);font-weight:600}
+  .dist-item .ln{color:var(--muted);font-weight:500}
+  .dist-x{background:transparent;border:none;color:var(--faint);font-size:18px;line-height:1;cursor:pointer;padding:0 4px;flex:0 0 auto}
+  .dist-x:hover{color:var(--red)}
+  .dist-empty{color:var(--faint);font-size:13px;padding:2px}
+  .muted{color:var(--muted);font-size:13px}
 
   .empty{text-align:center;color:var(--muted);padding:48px 20px}
   .empty .big{font-size:40px;margin-bottom:10px}
@@ -239,10 +250,12 @@
       </div>
 
       <div style="width:100%;margin-top:16px">
-        <label class="field" for="lostMinInput">Time lost to distractions <span class="opt">— optional, in minutes</span></label>
-        <div class="row wrap">
-          <input id="lostMinInput" type="number" min="0" step="1" placeholder="min" style="max-width:120px" />
-          <input id="lostNoteInput" type="text" placeholder="what happened? e.g. got a text, forgot to pause" style="flex:1;min-width:180px" />
+        <label class="field">Time lost to distractions <span class="opt">— log each interruption (minutes + note)</span></label>
+        <div id="distList" class="dist-list"></div>
+        <div class="row wrap" style="margin-top:8px">
+          <input id="distMin" type="number" min="1" max="600" placeholder="min" style="max-width:100px" />
+          <input id="distNote" type="text" placeholder="what happened? e.g. helped Leen, got a text" style="flex:1;min-width:150px" />
+          <button id="distAdd" class="btn ghost" type="button" style="padding:13px 18px">+ Add</button>
         </div>
       </div>
 
@@ -309,6 +322,33 @@
   </div>
 </div>
 
+<!-- ============ EDIT SESSION MODAL ============ -->
+<div class="overlay" id="editOverlay">
+  <div class="modal" style="max-width:540px">
+    <h3>Edit session</h3>
+    <p id="editWhen" class="muted"></p>
+    <label class="field" for="editPlan">What you did</label>
+    <textarea id="editPlan" rows="2"></textarea>
+    <label class="field" for="editNotes" style="margin-top:12px">Notes</label>
+    <textarea id="editNotes" rows="3"></textarea>
+    <div id="editReasonWrap" style="margin-top:12px;display:none">
+      <label class="field" for="editReason">Stop reason</label>
+      <input id="editReason" type="text" />
+    </div>
+    <label class="field" style="margin-top:14px">Time lost to distractions</label>
+    <div id="editDistList" class="dist-list"></div>
+    <div class="row wrap" style="margin-top:8px">
+      <input id="editDistMin" type="number" min="1" max="600" placeholder="min" style="max-width:100px" />
+      <input id="editDistNote" type="text" placeholder="what happened?" style="flex:1;min-width:140px" />
+      <button id="editDistAdd" class="btn ghost" type="button" style="padding:11px 16px">+ Add</button>
+    </div>
+    <div class="row" style="margin-top:20px">
+      <button id="editCancel" class="btn ghost block">Cancel</button>
+      <button id="editSave" class="btn primary block">Save changes</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function(){
   'use strict';
@@ -361,6 +401,20 @@
   }
   function esc(t){ return String(t==null?'':t).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 
+  // ---- distractions (multiple per session: [{min,note}]) ----
+  function distTotal(arr){ var t=0,i; arr=arr||[]; for(i=0;i<arr.length;i++) t+=Number(arr[i].min)||0; return t; }
+  function distRows(arr, readOnly){
+    arr=arr||[];
+    if(!arr.length) return '<div class="dist-empty">No distractions logged yet.</div>';
+    var h='',i;
+    for(i=0;i<arr.length;i++){
+      h+='<div class="dist-item"><span>⚠️ <b>'+(Number(arr[i].min)||0)+'m</b>'+
+        ((arr[i].note&&String(arr[i].note).trim())?' <span class="ln">— '+esc(arr[i].note)+'</span>':'')+'</span>'+
+        (readOnly?'':'<button class="dist-x" data-idx="'+i+'" title="Remove">×</button>')+'</div>';
+    }
+    return h;
+  }
+
   // ---------- timer math ----------
   function remainingMs(){
     if(!active) return 0;
@@ -381,11 +435,11 @@
       id:uid(), plan:plan, notes:'', plannedMinutes:minutes,
       startedAt:nowMs(), endsAt:nowMs()+minutes*60000, remainingMs:minutes*60000,
       paused:false, pauses:[], currentPauseStart:null,
-      lostMin:0, lostNote:''
+      distractions:[]
     };
     persist();
     el('notesInput').value='';
-    el('lostMinInput').value=''; el('lostNoteInput').value='';
+    el('distMin').value=''; el('distNote').value='';
     showView('active');
     renderActive();
     startTick();
@@ -423,7 +477,7 @@
       plannedMinutes:active.plannedMinutes, startedAt:active.startedAt, endedAt:endedAt,
       status:status, stopReason:reason||'', pauses:active.pauses.slice(),
       pauseMs:pauseMs, focusMs:focusMs,
-      lostMin:active.lostMin||0, lostNote:active.lostNote||'',
+      distractions:(active.distractions||[]).slice(),
       synced:false
     };
     sessions.push(rec);
@@ -472,9 +526,14 @@
     el('pauseBtn').classList.toggle('ghost', !active.paused);
     el('pausedBadge').style.display = active.paused ? 'inline-block' : 'none';
     el('notesInput').value = active.notes || '';
-    el('lostMinInput').value = active.lostMin ? active.lostMin : '';
-    el('lostNoteInput').value = active.lostNote || '';
+    if(!active.distractions) active.distractions=[];
+    renderDistList();
     updateTimer();
+  }
+
+  function renderDistList(){
+    if(!active) return;
+    el('distList').innerHTML = distRows(active.distractions, false);
   }
 
   function updateTimer(){
@@ -516,7 +575,7 @@
       var focus=0, brk=0, done=0, stopped=0, lost=0;
       for(i=0;i<list.length;i++){
         focus+=list[i].focusMs; brk+=list[i].pauseMs;
-        lost+=Number(list[i].lostMin)||0;
+        lost+=distTotal(list[i].distractions);
         if(list[i].status==='completed') done++; else stopped++;
       }
       html+='<div class="day">';
@@ -544,15 +603,17 @@
     h+='<div class="sess-time">'+hhmm(s.startedAt)+'<span class="arrow">→</span>'+hhmm(s.endedAt)+'</div>';
     h+=tag;
     if(CLOUD && s.synced===false) h+='<span class="unsynced-dot" title="Saved on this device, not yet synced to the Sheet"></span>';
-    h+='<button class="del" data-del="'+s.id+'">Delete</button>';
+    h+='<span class="card-actions"><button class="edit" data-edit="'+s.id+'">Edit</button><button class="del" data-del="'+s.id+'">Delete</button></span>';
     h+='</div>';
     h+='<div class="sess-plan">'+esc(s.plan)+'</div>';
     if(s.notes && s.notes.trim()) h+='<div class="sess-notes">'+esc(s.notes)+'</div>';
     if(s.status==='stopped' && s.stopReason){
       h+='<div class="lbl">Stop reason</div><div class="reason">'+esc(s.stopReason)+'</div>';
     }
-    if(s.lostMin>0){
-      h+='<div class="lost">⚠️ <span><b>'+s.lostMin+'m</b> lost to distractions'+((s.lostNote&&s.lostNote.trim())?' <span class="ln">— '+esc(s.lostNote)+'</span>':'')+'</span></div>';
+    var dt=distTotal(s.distractions);
+    if(dt>0){
+      h+='<div class="lbl" style="color:var(--amber)">⚠️ '+dt+'m lost to distractions'+((s.distractions.length>1)?(' · '+s.distractions.length+' interruptions'):'')+'</div>';
+      h+='<div class="dist-list ro">'+distRows(s.distractions, true)+'</div>';
     }
     h+='<div class="sess-foot">';
     h+='<span>⏱ <b>'+dur(s.focusMs)+'</b> focus</span>';
@@ -606,7 +667,9 @@
       rows.push([
         s.date, hhmm(s.startedAt), hhmm(s.endedAt), s.status,
         s.plannedMinutes, (s.focusMs/60000).toFixed(1), (s.pauseMs/60000).toFixed(1),
-        s.pauses.length, (s.lostMin||0), (s.lostNote||''), s.plan, s.notes, s.stopReason
+        s.pauses.length, distTotal(s.distractions),
+        (s.distractions||[]).map(function(d){return (Number(d.min)||0)+'m '+(d.note||'');}).join(' | '),
+        s.plan, s.notes, s.stopReason
       ]);
     }
     var csv=rows.map(function(r){return r.map(csvCell).join(',');}).join('\n');
@@ -703,12 +766,22 @@
     el('notesInput').addEventListener('input', function(){
       if(active){ active.notes=el('notesInput').value; persist(); }
     });
-    // distraction / lost-time autosave
-    el('lostMinInput').addEventListener('input', function(){
-      if(active){ var v=parseInt(el('lostMinInput').value,10); active.lostMin = (isNaN(v)||v<0)?0:v; persist(); }
-    });
-    el('lostNoteInput').addEventListener('input', function(){
-      if(active){ active.lostNote=el('lostNoteInput').value; persist(); }
+    // distractions — add one to the active session
+    function addDistraction(){
+      if(!active) return;
+      var v=parseInt(el('distMin').value,10);
+      if(isNaN(v)||v<1){ el('distMin').focus(); return; }
+      if(!active.distractions) active.distractions=[];
+      active.distractions.push({ min:Math.min(v,600), note:el('distNote').value.trim() });
+      el('distMin').value=''; el('distNote').value='';
+      persist(); renderDistList(); el('distMin').focus();
+    }
+    el('distAdd').addEventListener('click', addDistraction);
+    el('distMin').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); addDistraction(); } });
+    el('distNote').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); addDistraction(); } });
+    el('distList').addEventListener('click', function(e){
+      var b=e.target.closest('[data-idx]'); if(!b || !active) return;
+      active.distractions.splice(+b.getAttribute('data-idx'),1); persist(); renderDistList();
     });
 
     // pause / resume
@@ -753,6 +826,8 @@
       }
     });
     el('reportList').addEventListener('click', function(e){
+      var ed=e.target.closest('[data-edit]');
+      if(ed){ openEdit(ed.getAttribute('data-edit')); return; }
       var btn=e.target.closest('[data-del]'); if(!btn) return;
       var id=btn.getAttribute('data-del');
       if(confirm('Delete this session?')){
@@ -774,13 +849,26 @@
     el('userInput').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); el('userSave').click(); } });
     el('userPill').addEventListener('click', function(){ openUserModal(true); });
 
-    // keyboard: space toggles pause when active
+    // edit session modal
+    el('editDistAdd').addEventListener('click', editAddDist);
+    el('editDistMin').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); editAddDist(); } });
+    el('editDistNote').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); editAddDist(); } });
+    el('editDistList').addEventListener('click', function(e){
+      var b=e.target.closest('[data-idx]'); if(!b || !editDraft) return;
+      editDraft.distractions.splice(+b.getAttribute('data-idx'),1); renderEditDist();
+    });
+    el('editSave').addEventListener('click', saveEdit);
+    el('editCancel').addEventListener('click', function(){ editDraft=null; closeModal('editOverlay'); });
+
+    // keyboard: space toggles pause when active — but NOT while typing in a field or with a modal open
     document.addEventListener('keydown', function(e){
-      if(e.code==='Space' && active && el('view-active').classList.contains('active')
-         && document.activeElement.tagName!=='TEXTAREA' && !el('stopOverlay').classList.contains('show')){
-        e.preventDefault();
-        if(active.paused) resumeSession(); else pauseSession();
-      }
+      if(e.code!=='Space') return;
+      if(!active || !el('view-active').classList.contains('active')) return;
+      var ae=document.activeElement, tag=ae?ae.tagName:'';
+      if(tag==='INPUT' || tag==='TEXTAREA' || tag==='SELECT' || (ae && ae.isContentEditable)) return;
+      if(el('stopOverlay').classList.contains('show') || el('editOverlay').classList.contains('show') || el('userOverlay').classList.contains('show')) return;
+      e.preventDefault();
+      if(active.paused) resumeSession(); else pauseSession();
     });
   }
 
@@ -807,7 +895,9 @@
       focus_min:String(Math.round(s.focusMs/6000)/10),
       break_min:String(Math.round((s.pauseMs||0)/6000)/10),
       breaks:String((s.pauses||[]).length),
-      lost_min:String(s.lostMin||0), lost_note:s.lostNote||'',
+      lost_min:String(distTotal(s.distractions)),
+      lost_note:(s.distractions||[]).filter(function(d){return d.note&&String(d.note).trim();}).map(function(d){return (Number(d.min)||0)+'m '+d.note;}).join('; '),
+      distractions_json:JSON.stringify(s.distractions||[]),
       plan:s.plan||'', notes:s.notes||'', stop_reason:s.stopReason||'',
       started_ms:String(s.startedAt), ended_ms:String(s.endedAt),
       pauses_json:JSON.stringify(s.pauses||[])
@@ -820,13 +910,16 @@
     var focusMs;
     if(startedAt && endedAt){ focusMs=Math.max(0,(endedAt-startedAt)-pauseMs); }
     else { focusMs=Math.round((Number(r.focus_min)||0)*60000); pauseMs=Math.round((Number(r.break_min)||0)*60000); }
+    var distractions=[];
+    try{ var dj=JSON.parse(r.distractions_json||'[]'); if(Array.isArray(dj)) distractions=dj.map(function(d){return {min:Number(d.min)||0, note:String(d.note||'')};}); }catch(e){ distractions=[]; }
+    if(!distractions.length && Number(r.lost_min)>0){ distractions=[{min:Number(r.lost_min)||0, note:String(r.lost_note||'')}]; }   // legacy single-field rows
     return {
       id:String(r.id), date:r.date, plan:r.plan||'', notes:r.notes||'',
       status:r.status||'completed', stopReason:r.stop_reason||'',
       plannedMinutes:Number(r.planned_min)||30,
       startedAt:startedAt, endedAt:endedAt,
       pauses:pauses, pauseMs:pauseMs, focusMs:focusMs,
-      lostMin:Number(r.lost_min)||0, lostNote:r.lost_note||'',
+      distractions:distractions,
       synced:true
     };
   }
@@ -883,6 +976,44 @@
     renderUserPill();
     if(CLOUD && !currentUser){ openUserModal(false); }
     else { pullAll(); }
+  }
+
+  // ---- edit a saved session ----
+  var editDraft=null;
+  function findSession(id){ for(var i=0;i<sessions.length;i++) if(sessions[i].id===id) return sessions[i]; return null; }
+  function renderEditDist(){ el('editDistList').innerHTML = distRows(editDraft?editDraft.distractions:[], false); }
+  function openEdit(id){
+    var s=findSession(id); if(!s) return;
+    editDraft={ id:id, distractions:(s.distractions||[]).map(function(d){return {min:Number(d.min)||0, note:String(d.note||'')};}) };
+    el('editWhen').textContent = niceDate(s.date)+' · '+hhmm(s.startedAt)+'–'+hhmm(s.endedAt)+' · '+(s.status==='completed'?'Completed':'Stopped early');
+    el('editPlan').value = s.plan||'';
+    el('editNotes').value = s.notes||'';
+    el('editReasonWrap').style.display = (s.status==='stopped')?'block':'none';
+    el('editReason').value = s.stopReason||'';
+    el('editDistMin').value=''; el('editDistNote').value='';
+    renderEditDist();
+    openModal('editOverlay');
+  }
+  function editAddDist(){
+    if(!editDraft) return;
+    var v=parseInt(el('editDistMin').value,10);
+    if(isNaN(v)||v<1){ el('editDistMin').focus(); return; }
+    editDraft.distractions.push({ min:Math.min(v,600), note:el('editDistNote').value.trim() });
+    el('editDistMin').value=''; el('editDistNote').value=''; renderEditDist(); el('editDistMin').focus();
+  }
+  function saveEdit(){
+    if(!editDraft){ closeModal('editOverlay'); return; }
+    var s=findSession(editDraft.id);
+    if(s){
+      s.plan=el('editPlan').value.trim();
+      s.notes=el('editNotes').value;
+      if(s.status==='stopped') s.stopReason=el('editReason').value.trim();
+      s.distractions=editDraft.distractions.slice();
+      s.synced=false;
+      persist(); renderReport(); renderTodayStats();
+      pushSave(s);   // appendOrUpdate by id → updates the existing Sheet row
+    }
+    editDraft=null; closeModal('editOverlay');
   }
 
   // ============ init ============
