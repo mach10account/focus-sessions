@@ -71,12 +71,16 @@
   .card + .card{margin-top:16px}
 
   label.field{display:block;font-size:13px;color:var(--muted);font-weight:600;margin-bottom:8px;letter-spacing:.2px}
-  textarea,input[type=text],input[type=number],input[type=datetime-local],select{
+  textarea,input[type=text],input[type=number],input[type=datetime-local],input[type=date],select{
     width:100%;background:var(--bg-soft);border:1px solid var(--line);border-radius:12px;
     color:var(--text);font-size:15px;padding:13px 14px;font-family:inherit;resize:vertical;outline:none;transition:.15s;
   }
   select{cursor:pointer;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%239aa4b5' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:34px}
-  input[type=datetime-local]{color-scheme:dark}
+  input[type=datetime-local],input[type=date]{color-scheme:dark}
+  .report-filter{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:0 0 16px}
+  .daterange{display:flex;align-items:center;gap:8px}
+  .daterange input[type=date]{width:auto;padding:9px 12px;font-size:13px}
+  .daterange .arrow{color:var(--faint)}
   textarea:focus,input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(99,102,241,.18)}
   .field .opt{color:var(--faint);font-weight:500;text-transform:none;letter-spacing:0}
   textarea::placeholder{color:var(--faint)}
@@ -233,12 +237,8 @@
       <label class="field" for="planInput">What will you do this session?</label>
       <textarea id="planInput" rows="3" placeholder="e.g. Draft the proposal intro and outline the next 3 sections…"></textarea>
 
-      <label class="field" style="margin-top:18px">Project</label>
-      <div class="row" style="gap:8px">
-        <select id="projectSelect" style="flex:1"><option value="">No project</option></select>
-        <button id="projectNew" class="btn ghost" type="button" style="padding:11px 16px">+ New</button>
-        <button id="projectManage" class="btn ghost" type="button" style="padding:11px 14px" title="Manage projects">⚙</button>
-      </div>
+      <label class="field" style="margin-top:18px">Project <span class="opt">— add/manage in the Tasks tab</span></label>
+      <select id="projectSelect" style="width:100%"><option value="">No project</option></select>
 
       <label class="field" style="margin-top:18px">Session length</label>
       <div class="pills" id="minutePills">
@@ -313,6 +313,19 @@
         <button id="clearBtn" class="btn ghost" style="padding:10px 16px;font-size:13px">Clear all</button>
       </div>
     </div>
+    <div class="report-filter">
+      <div class="pills" id="datePresets">
+        <div class="pill active" data-range="all">All</div>
+        <div class="pill" data-range="today">Today</div>
+        <div class="pill" data-range="7">7 days</div>
+        <div class="pill" data-range="30">30 days</div>
+      </div>
+      <div class="daterange">
+        <input type="date" id="dateFrom" title="From" />
+        <span class="arrow">→</span>
+        <input type="date" id="dateTo" title="To" />
+      </div>
+    </div>
     <div id="reportList"></div>
   </section>
 
@@ -320,7 +333,10 @@
   <section id="view-tasks" class="view">
     <div class="report-head">
       <h2 style="margin:0;font-size:20px">Tasks</h2>
-      <button id="taskNew" class="btn primary" style="padding:10px 18px">+ New task</button>
+      <div class="row">
+        <button id="tasksProjects" class="btn ghost" style="padding:10px 16px;font-size:13px">▦ Projects</button>
+        <button id="taskNew" class="btn primary" style="padding:10px 18px">+ New task</button>
+      </div>
     </div>
     <div id="taskList"></div>
   </section>
@@ -665,14 +681,23 @@
     return d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
   }
 
+  var reportFrom='', reportTo='';
+  function filteredSessions(){
+    return sessions.filter(function(s){ return (!reportFrom || s.date>=reportFrom) && (!reportTo || s.date<=reportTo); });
+  }
   function renderReport(){
     var box=el('reportList');
     if(sessions.length===0){
-      box.innerHTML='<div class="empty"><div class="big">🗓️</div><div>No sessions yet.<br>Start your first 30-minute session from the Timer tab.</div></div>';
+      box.innerHTML='<div class="empty"><div class="big">🗓️</div><div>No sessions yet.<br>Start your first session from the Timer tab.</div></div>';
+      return;
+    }
+    var fs=filteredSessions();
+    if(fs.length===0){
+      box.innerHTML='<div class="empty"><div class="big">🔎</div><div>No sessions in this date range.</div></div>';
       return;
     }
     var groups={}, i, s;
-    for(i=0;i<sessions.length;i++){ s=sessions[i]; (groups[s.date]=groups[s.date]||[]).push(s); }
+    for(i=0;i<fs.length;i++){ s=fs[i]; (groups[s.date]=groups[s.date]||[]).push(s); }
     var dates=Object.keys(groups).sort().reverse();
     var html='';
     for(var d=0; d<dates.length; d++){
@@ -766,16 +791,16 @@
 
   // ---------- export ----------
   function exportCSV(){
-    var head=['date','start','end','status','plannedMin','focusMin','breakMin','breaks','lostMin','lostNote','plan','notes','stopReason'];
-    var rows=[head], i, s;
-    for(i=0;i<sessions.length;i++){
-      s=sessions[i];
+    var head=['date','start','end','status','plannedMin','focusMin','breakMin','breaks','lostMin','lostNote','project','plan','notes','stopReason'];
+    var fs=filteredSessions(), rows=[head], i, s;
+    for(i=0;i<fs.length;i++){
+      s=fs[i];
       rows.push([
         s.date, hhmm(s.startedAt), hhmm(s.endedAt), s.status,
         s.plannedMinutes, (s.focusMs/60000).toFixed(1), (s.pauseMs/60000).toFixed(1),
         s.pauses.length, distTotal(s.distractions),
         (s.distractions||[]).map(function(d){return (Number(d.min)||0)+'m '+(d.note||'');}).join(' | '),
-        s.plan, s.notes, s.stopReason
+        (s.project||''), s.plan, s.notes, s.stopReason
       ]);
     }
     var csv=rows.map(function(r){return r.map(csvCell).join(',');}).join('\n');
@@ -983,10 +1008,7 @@
 
     // projects
     el('projectSelect').addEventListener('change', function(){ settings.project=el('projectSelect').value; persist(); });
-    el('projectNew').addEventListener('click', function(){
-      var n=prompt('New project name:'); if(n && n.trim()){ var p=addProject(n); if(p){ settings.project=p.name; persist(); renderProjectOptions(); } }
-    });
-    el('projectManage').addEventListener('click', function(){ renderProjManage(); openModal('projOverlay'); });
+    el('tasksProjects').addEventListener('click', function(){ renderProjManage(); openModal('projOverlay'); });
     el('projAdd').addEventListener('click', function(){
       var n=el('projNewName').value; if(n && n.trim()){ addProject(n); el('projNewName').value=''; el('projNewName').focus(); }
     });
@@ -996,6 +1018,27 @@
       if(confirm('Delete this project? (existing sessions/tasks keep their label)')) removeProject(b.getAttribute('data-proj'));
     });
     el('projClose').addEventListener('click', function(){ closeModal('projOverlay'); renderProjectOptions(); });
+
+    // report date filter
+    function applyDatePreset(range){
+      var today=dateKey(nowMs());
+      if(range==='all'){ reportFrom=''; reportTo=''; }
+      else if(range==='today'){ reportFrom=today; reportTo=today; }
+      else { var n=parseInt(range,10); reportFrom=dateKey(nowMs()-(n-1)*86400000); reportTo=today; }
+      el('dateFrom').value=reportFrom; el('dateTo').value=reportTo;
+      document.querySelectorAll('#datePresets .pill').forEach(function(p){ p.classList.toggle('active', p.getAttribute('data-range')===range); });
+      renderReport();
+    }
+    document.querySelectorAll('#datePresets .pill').forEach(function(p){
+      p.addEventListener('click', function(){ applyDatePreset(p.getAttribute('data-range')); });
+    });
+    function onDateInput(){
+      reportFrom=el('dateFrom').value; reportTo=el('dateTo').value;
+      document.querySelectorAll('#datePresets .pill').forEach(function(p){ p.classList.remove('active'); });
+      renderReport();
+    }
+    el('dateFrom').addEventListener('change', onDateInput);
+    el('dateTo').addEventListener('change', onDateInput);
 
     // keyboard: space toggles pause when active — but NOT while typing in a field or with a modal open
     document.addEventListener('keydown', function(e){
