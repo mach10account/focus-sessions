@@ -3,9 +3,11 @@
 A simple, self-contained web app to split your day into focus sessions (default 30 min).
 
 Before each session you write your intention, run a countdown, take live notes, and track
-breaks. **Stop early** asks for a reason; when the timer hits **0:00** the session auto-saves.
-A **daily report** groups everything by day, with focus time, break time, and completed vs.
-stopped counts (CSV export included).
+breaks. You can also log **time lost to distractions** (a minutes estimate + a short note, e.g.
+"got a text", "forgot to pause") for interruptions where the timer kept running. **Stop early**
+asks for a reason; when the timer hits **0:00** the session auto-saves. A **daily report** groups
+everything by day, with focus time, break time, lost time, and completed vs. stopped counts
+(CSV export included).
 
 ## Multi-user
 
