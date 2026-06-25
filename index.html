@@ -237,8 +237,8 @@
       <label class="field" for="planInput">What will you do this session?</label>
       <textarea id="planInput" rows="3" placeholder="e.g. Draft the proposal intro and outline the next 3 sections…"></textarea>
 
-      <label class="field" style="margin-top:18px">Project <span class="opt">— add/manage in the Tasks tab</span></label>
-      <select id="projectSelect" style="width:100%"><option value="">No project</option></select>
+      <label class="field" style="margin-top:18px">Projects <span class="opt">— pick one or more (add/manage in the Tasks tab)</span></label>
+      <div class="pills" id="projectPills"></div>
 
       <label class="field" style="margin-top:18px">Session length</label>
       <div class="pills" id="minutePills">
@@ -547,10 +547,10 @@
 
   // ---------- session lifecycle ----------
   function startSession(plan, minutes){
-    var proj = el('projectSelect') ? el('projectSelect').value : '';
-    settings.project = proj;
+    var projs = (settings.projects||[]).filter(function(n){ return projects.some(function(p){return p.name===n;}); });
+    settings.projects = projs;
     active = {
-      id:uid(), plan:plan, notes:'', plannedMinutes:minutes, project:proj,
+      id:uid(), plan:plan, notes:'', plannedMinutes:minutes, projects:projs,
       startedAt:nowMs(), endsAt:nowMs()+minutes*60000, remainingMs:minutes*60000,
       paused:false, pauses:[], currentPauseStart:null,
       distractions:[]
@@ -592,7 +592,7 @@
     var focusMs = Math.max(0, (endedAt - active.startedAt) - pauseMs);
     var rec={
       id:active.id, date:dateKey(active.startedAt), plan:active.plan, notes:active.notes,
-      plannedMinutes:active.plannedMinutes, project:active.project||'',
+      plannedMinutes:active.plannedMinutes, projects:(active.projects||[]).slice(),
       startedAt:active.startedAt, endedAt:endedAt,
       status:status, stopReason:reason||'', pauses:active.pauses.slice(),
       pauseMs:pauseMs, focusMs:focusMs,
@@ -736,7 +736,7 @@
     h+='<span class="card-actions"><button class="edit" data-edit="'+s.id+'">Edit</button><button class="del" data-del="'+s.id+'">Delete</button></span>';
     h+='</div>';
     h+='<div class="sess-plan">'+esc(s.plan)+'</div>';
-    if(s.project) h+='<div style="margin:2px 0 4px"><span class="proj-chip">▦ '+esc(s.project)+'</span></div>';
+    if(s.projects && s.projects.length) h+='<div style="margin:2px 0 4px;display:flex;gap:6px;flex-wrap:wrap">'+s.projects.map(function(pn){return '<span class="proj-chip">▦ '+esc(pn)+'</span>';}).join('')+'</div>';
     if(s.notes && s.notes.trim()) h+='<div class="sess-notes">'+esc(s.notes)+'</div>';
     if(s.status==='stopped' && s.stopReason){
       h+='<div class="lbl">Stop reason</div><div class="reason">'+esc(s.stopReason)+'</div>';
@@ -800,7 +800,7 @@
         s.plannedMinutes, (s.focusMs/60000).toFixed(1), (s.pauseMs/60000).toFixed(1),
         s.pauses.length, distTotal(s.distractions),
         (s.distractions||[]).map(function(d){return (Number(d.min)||0)+'m '+(d.note||'');}).join(' | '),
-        (s.project||''), s.plan, s.notes, s.stopReason
+        ((s.projects||[]).join(', ')), s.plan, s.notes, s.stopReason
       ]);
     }
     var csv=rows.map(function(r){return r.map(csvCell).join(',');}).join('\n');
@@ -1007,7 +1007,14 @@
     el('dueClose').addEventListener('click', function(){ closeModal('dueOverlay'); });
 
     // projects
-    el('projectSelect').addEventListener('change', function(){ settings.project=el('projectSelect').value; persist(); });
+    el('projectPills').addEventListener('click', function(e){
+      var p=e.target.closest('[data-proj-name]'); if(!p) return;
+      var name=p.getAttribute('data-proj-name');
+      var sel=(settings.projects||[]).slice();
+      var i=sel.indexOf(name);
+      if(i>=0) sel.splice(i,1); else sel.push(name);
+      settings.projects=sel; persist(); renderProjectPills();
+    });
     el('tasksProjects').addEventListener('click', function(){ renderProjManage(); openModal('projOverlay'); });
     el('projAdd').addEventListener('click', function(){
       var n=el('projNewName').value; if(n && n.trim()){ addProject(n); el('projNewName').value=''; el('projNewName').focus(); }
@@ -1085,7 +1092,8 @@
       lost_min:String(distTotal(s.distractions)),
       lost_note:(s.distractions||[]).filter(function(d){return d.note&&String(d.note).trim();}).map(function(d){return (Number(d.min)||0)+'m '+d.note;}).join('; '),
       distractions_json:JSON.stringify(s.distractions||[]),
-      project:s.project||'',
+      project:(s.projects||[]).join(', '),
+      projects_json:JSON.stringify(s.projects||[]),
       plan:s.plan||'', notes:s.notes||'', stop_reason:s.stopReason||'',
       started_ms:String(s.startedAt), ended_ms:String(s.endedAt),
       pauses_json:JSON.stringify(s.pauses||[])
@@ -1101,13 +1109,16 @@
     var distractions=[];
     try{ var dj=JSON.parse(r.distractions_json||'[]'); if(Array.isArray(dj)) distractions=dj.map(function(d){return {min:Number(d.min)||0, note:String(d.note||'')};}); }catch(e){ distractions=[]; }
     if(!distractions.length && Number(r.lost_min)>0){ distractions=[{min:Number(r.lost_min)||0, note:String(r.lost_note||'')}]; }   // legacy single-field rows
+    var projs=[];
+    try{ var pjj=JSON.parse(r.projects_json||'[]'); if(Array.isArray(pjj)) projs=pjj.map(String); }catch(e){ projs=[]; }
+    if(!projs.length && r.project) projs=String(r.project).split(',').map(function(x){return x.trim();}).filter(Boolean);   // legacy single project
     return {
       id:String(r.id), date:r.date, plan:r.plan||'', notes:r.notes||'',
       status:r.status||'completed', stopReason:r.stop_reason||'',
       plannedMinutes:Number(r.planned_min)||30,
       startedAt:startedAt, endedAt:endedAt,
       pauses:pauses, pauseMs:pauseMs, focusMs:focusMs,
-      distractions:distractions, project:String(r.project||''),
+      distractions:distractions, projects:projs,
       synced:true
     };
   }
@@ -1228,7 +1239,9 @@
     return p;
   }
   function removeProject(id){
+    var gone=null,k; for(k=0;k<projects.length;k++) if(projects[k].id===id){ gone=projects[k]; break; }
     projects=projects.filter(function(p){return p.id!==id;});
+    if(gone && settings.projects){ settings.projects=settings.projects.filter(function(n){return n!==gone.name;}); persist(); }
     persistTP(); renderProjectOptions(); renderProjManage();
     if(CLOUD&&currentUser) enqueueWrite(function(){ return tpApi({action:'delete',entity:'project',user:currentUser,id:id}); }).catch(function(){});
   }
@@ -1242,15 +1255,23 @@
       pending.forEach(pushProject);
     }).catch(function(){});
   }
+  function projSorted(){ return projects.slice().sort(function(a,b){return a.name.toLowerCase()<b.name.toLowerCase()?-1:1;}); }
   function renderProjectOptions(){
-    var sorted=projects.slice().sort(function(a,b){return a.name.toLowerCase()<b.name.toLowerCase()?-1:1;});
-    [['projectSelect', settings.project||''], ['taskProject', null]].forEach(function(pair){
-      var sel=el(pair[0]); if(!sel) return;
-      var keep = pair[1]!==null ? pair[1] : sel.value;
-      var h='<option value="">No project</option>';
-      sorted.forEach(function(p){ h+='<option value="'+esc(p.name)+'">'+esc(p.name)+'</option>'; });
+    var sel=el('taskProject');   // task editor = single-select dropdown
+    if(sel){
+      var keep=sel.value, h='<option value="">No project</option>';
+      projSorted().forEach(function(p){ h+='<option value="'+esc(p.name)+'">'+esc(p.name)+'</option>'; });
       sel.innerHTML=h; sel.value=keep||'';
-    });
+    }
+    renderProjectPills();
+  }
+  function renderProjectPills(){
+    var box=el('projectPills'); if(!box) return;
+    var sorted=projSorted();
+    if(!sorted.length){ box.innerHTML='<div class="dist-empty">No projects yet — add them in the Tasks tab.</div>'; return; }
+    var sel=settings.projects||[], h='';
+    sorted.forEach(function(p){ h+='<div class="pill'+(sel.indexOf(p.name)>=0?' active':'')+'" data-proj-name="'+esc(p.name)+'">'+esc(p.name)+'</div>'; });
+    box.innerHTML=h;
   }
   function renderProjManage(){
     var box=el('projManageList'); if(!box) return;
@@ -1358,7 +1379,7 @@
     el('taskModalTitle').textContent = t?'Edit task':'New task';
     el('taskTitle').value = t?t.title:'';
     el('taskPriority').value = t?(t.priority||'med'):'med';
-    el('taskProject').value = t?(t.project||''):(settings.project||'');
+    el('taskProject').value = t?(t.project||''):'';
     el('taskDue').value = (t&&t.dueMs)?localDT(t.dueMs):'';
     el('taskNotes').value = t?(t.notes||''):'';
     el('taskDeleteBtn').style.display = t?'inline-flex':'none';
