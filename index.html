@@ -147,6 +147,18 @@
   .day-stats span b{color:var(--text)}
   .day-stats .sep{color:var(--line)}
 
+  .summary{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 20px;margin-bottom:20px;box-shadow:var(--shadow)}
+  .summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px}
+  .sm{text-align:center}
+  .sm-v{font-size:26px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+  .sm-k{font-size:10.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.6px;font-weight:700;margin-top:6px}
+  .summary-sub{color:var(--muted);font-size:13px;margin-top:14px;text-align:center;line-height:1.7}
+  .summary-sub b{color:var(--text)}
+  .day-note{margin:4px 0 12px}
+  .day-note-label{font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--faint);font-weight:700;margin-bottom:6px}
+  .day-note-input{width:100%;background:var(--bg-soft);border:1px solid var(--line);border-radius:10px;color:var(--text);font-size:14px;padding:10px 12px;font-family:inherit;resize:vertical;outline:none;transition:.15s}
+  .day-note-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(99,102,241,.18)}
+
   .sess{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:10px}
   .sess-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
   .sess-time{font-weight:700;font-size:14px;font-variant-numeric:tabular-nums}
@@ -704,10 +716,32 @@
       box.innerHTML='<div class="empty"><div class="big">🔎</div><div>No sessions in this date range.</div></div>';
       return;
     }
+    // ---- summary over the filtered range ----
+    var tF=0,tB=0,tL=0,tLB=0,tLW=0,tDone=0,tStop=0,projFocus={},k;
+    for(k=0;k<fs.length;k++){
+      var x=fs[k];
+      tF+=x.focusMs; tB+=x.pauseMs; tL+=distTotal(x.distractions);
+      tLB+=distTotalByType(x.distractions,'break'); tLW+=distTotalByType(x.distractions,'work');
+      if(x.status==='completed') tDone++; else tStop++;
+      (x.projects||[]).forEach(function(pn){ projFocus[pn]=(projFocus[pn]||0)+x.focusMs; });
+    }
+    var pct=(tDone+tStop)>0?Math.round(tDone*100/(tDone+tStop)):0;
+    var avg=fs.length?tF/fs.length:0;
+    var lx=[]; if(tLB>0) lx.push('☕ '+tLB+'m break'); if(tLW>0) lx.push('💼 '+tLW+'m work');
+    var topProj=Object.keys(projFocus).sort(function(a,b){return projFocus[b]-projFocus[a];}).slice(0,4);
+    var html='<div class="summary"><div class="summary-grid">'+
+      '<div class="sm"><div class="sm-v">'+dur(tF)+'</div><div class="sm-k">Focused</div></div>'+
+      '<div class="sm"><div class="sm-v">'+fs.length+'</div><div class="sm-k">Sessions</div></div>'+
+      '<div class="sm"><div class="sm-v">'+pct+'%</div><div class="sm-k">Completed</div></div>'+
+      '<div class="sm"><div class="sm-v" style="color:var(--amber)">'+tL+'m</div><div class="sm-k">Lost</div></div>'+
+      '</div>'+
+      '<div class="summary-sub">avg <b>'+dur(avg)+'</b>/session · <b>'+dur(tB)+'</b> on breaks'+(lx.length?(' · '+lx.join(' · ')):'')+' · <b>'+tDone+'</b> completed, <b>'+tStop+'</b> stopped</div>'+
+      (topProj.length?('<div class="summary-sub" style="margin-top:6px">Focus by project: '+topProj.map(function(pn){return '<span class="proj-chip">▦ '+esc(pn)+' '+dur(projFocus[pn])+'</span>';}).join(' ')+'</div>'):'')+
+      '</div>';
+    // ---- per-day groups ----
     var groups={}, i, s;
     for(i=0;i<fs.length;i++){ s=fs[i]; (groups[s.date]=groups[s.date]||[]).push(s); }
     var dates=Object.keys(groups).sort().reverse();
-    var html='';
     for(var d=0; d<dates.length; d++){
       var list=groups[dates[d]].slice().sort(function(a,b){return a.startedAt-b.startedAt;});
       var focus=0, brk=0, done=0, stopped=0, lost=0;
@@ -726,6 +760,9 @@
             '<span class="sep">·</span>'+
             '<span><b>'+done+'</b> completed, <b>'+stopped+'</b> stopped early</span>'+
             '</div>';
+      var rv=reviews[dates[d]]||{};
+      html+='<div class="day-note"><div class="day-note-label">💭 What to improve</div>'+
+            '<textarea class="day-note-input" data-day="'+dates[d]+'" rows="2" placeholder="What could you do better next time?">'+esc(rv.note||'')+'</textarea></div>';
       for(i=0;i<list.length;i++) html+=sessionCard(list[i]);
       html+='</div>';
     }
@@ -978,6 +1015,17 @@
         if(CLOUD && currentUser){ setSync('busy','Syncing'); deleteRemote(id).then(function(){ setSync('ok','Synced'); }).catch(function(){ setSync('off','Offline'); }); }
       }
     });
+    // daily "what to improve" notes (debounced save while typing, flush on blur)
+    var noteTimers={};
+    el('reportList').addEventListener('input', function(e){
+      var ta=e.target.closest('.day-note-input'); if(!ta) return;
+      var date=ta.getAttribute('data-day'); saveReview(date, ta.value);
+      clearTimeout(noteTimers[date]); noteTimers[date]=setTimeout(function(){ pushReview(date); }, 1200);
+    });
+    el('reportList').addEventListener('change', function(e){
+      var ta=e.target.closest('.day-note-input'); if(!ta) return;
+      var date=ta.getAttribute('data-day'); clearTimeout(noteTimers[date]); saveReview(date, ta.value); pushReview(date);
+    });
 
     // user identity
     el('userSave').addEventListener('click', function(){
@@ -1180,8 +1228,8 @@
     localStorage.setItem(USER_KEY, JSON.stringify(currentUser));
     renderUserPill();
     if(isSwitch && name!==prev){
-      sessions=[]; tasks=[]; projects=[]; notifiedIds={};
-      persist(); persistTP();
+      sessions=[]; tasks=[]; projects=[]; reviews={}; notifiedIds={};
+      persist(); persistTP(); persistReviews();
       renderReport(); renderTodayStats(); renderTasks(); renderProjectOptions(); renderProjManage();
     }
     pullAll(); syncTP();
@@ -1238,6 +1286,9 @@
   var projects=load(PROJ_KEY, []);
   var notifiedIds={};
   function persistTP(){ localStorage.setItem(TASKS_KEY, JSON.stringify(tasks)); localStorage.setItem(PROJ_KEY, JSON.stringify(projects)); }
+  var REVIEWS_KEY='fs_reviews_v1';
+  var reviews=load(REVIEWS_KEY, {});
+  function persistReviews(){ localStorage.setItem(REVIEWS_KEY, JSON.stringify(reviews)); }
   function tpApi(payload){ return fetch(TP_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }); }
 
   // ---- projects ----
@@ -1438,7 +1489,29 @@
     el('dueList').innerHTML=h;
     openModal('dueOverlay');
   }
-  function syncTP(){ pullProjects(); pullTasks(); }
+  // ---- daily reviews ("what to improve") ----
+  function reviewId(date){ return currentUser+'__'+date; }
+  function reviewToRow(date){ var r=reviews[date]||{}; return { id:reviewId(date), user:currentUser, date:date, note:r.note||'', updated_ms:String(r.updatedMs||0) }; }
+  function pushReview(date){
+    if(!CLOUD||!currentUser) return;
+    enqueueWrite(function(){ return tpApi({action:'save',entity:'review',user:currentUser,items:[reviewToRow(date)]}); })
+      .then(function(){ if(reviews[date]) reviews[date].synced=true; persistReviews(); }).catch(function(){});
+  }
+  function saveReview(date, note){
+    reviews[date]=reviews[date]||{}; reviews[date].note=note; reviews[date].updatedMs=nowMs(); reviews[date].synced=false;
+    persistReviews();
+  }
+  function pullReviews(){
+    if(!CLOUD||!currentUser) return;
+    tpApi({action:'list',entity:'review',user:currentUser}).then(function(rows){
+      var remote={};
+      (Array.isArray(rows)?rows:[]).filter(function(r){return r&&r.id&&r.date;}).forEach(function(r){ remote[r.date]={note:String(r.note||''), updatedMs:Number(r.updated_ms)||0, synced:true}; });
+      Object.keys(reviews).forEach(function(d){ if(reviews[d] && reviews[d].synced!==true && !remote[d]) remote[d]=reviews[d]; });
+      reviews=remote; persistReviews(); renderReport();
+      Object.keys(reviews).forEach(function(d){ if(reviews[d].synced!==true) pushReview(d); });
+    }).catch(function(){});
+  }
+  function syncTP(){ pullProjects(); pullTasks(); pullReviews(); }
 
   // ============ init ============
   function init(){
