@@ -269,6 +269,7 @@
       </div>
 
       <button id="startBtn" class="btn primary block lg" style="margin-top:22px" disabled>▶ Start session</button>
+      <button id="manualBtn" class="btn ghost block" type="button" style="margin-top:10px">＋ Log focus time you forgot to track</button>
       <div class="today" id="todayStats"></div>
     </div>
     <p class="footnote">Tip: write your intention first — then start the timer. It auto-saves when it reaches 0:00.</p>
@@ -479,6 +480,35 @@
     <h3 style="text-align:center;margin-bottom:6px">Tasks due</h3>
     <div id="dueList" class="dist-list" style="margin-top:6px"></div>
     <div class="row" style="margin-top:18px"><button id="dueClose" class="btn primary block">Got it</button></div>
+  </div>
+</div>
+
+<!-- ============ LOG FOCUS TIME (manual) MODAL ============ -->
+<div class="overlay" id="manualOverlay">
+  <div class="modal" style="max-width:520px">
+    <h3>Log focus time</h3>
+    <p class="muted">Forgot to start the timer? Add the focus session manually.</p>
+    <label class="field" for="manPlan">What did you work on?</label>
+    <input id="manPlan" type="text" placeholder="e.g. Wrote the proposal intro" autocomplete="off" />
+    <div class="err" id="manErr">Enter what you did and how many minutes.</div>
+    <div class="row wrap" style="margin-top:12px;gap:12px">
+      <div style="flex:1;min-width:120px">
+        <label class="field" for="manMin">Focus minutes</label>
+        <input id="manMin" type="number" min="1" max="1440" placeholder="e.g. 45" />
+      </div>
+      <div style="flex:1;min-width:170px">
+        <label class="field" for="manWhen">When it started</label>
+        <input id="manWhen" type="datetime-local" />
+      </div>
+    </div>
+    <label class="field" style="margin-top:12px">Projects <span class="opt">— optional</span></label>
+    <div class="pills" id="manProjectPills"></div>
+    <label class="field" for="manNotes" style="margin-top:12px">Notes <span class="opt">— optional</span></label>
+    <textarea id="manNotes" rows="2"></textarea>
+    <div class="row" style="margin-top:20px">
+      <button id="manCancel" class="btn ghost block">Cancel</button>
+      <button id="manSave" class="btn primary block">Add session</button>
+    </div>
   </div>
 </div>
 
@@ -1074,6 +1104,17 @@
       if(i>=0) sel.splice(i,1); else sel.push(name);
       settings.projects=sel; persist(); renderProjectPills();
     });
+    // manual "log focus time" modal
+    el('manualBtn').addEventListener('click', openManual);
+    el('manSave').addEventListener('click', saveManual);
+    el('manCancel').addEventListener('click', function(){ closeModal('manualOverlay'); });
+    el('manPlan').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); el('manMin').focus(); } });
+    el('manProjectPills').addEventListener('click', function(e){
+      var p=e.target.closest('[data-manproj]'); if(!p) return;
+      var name=p.getAttribute('data-manproj'), i=manProjects.indexOf(name);
+      if(i>=0) manProjects.splice(i,1); else manProjects.push(name);
+      renderManProjectPills();
+    });
     el('tasksProjects').addEventListener('click', function(){ renderProjManage(); openModal('projOverlay'); });
     el('projAdd').addEventListener('click', function(){
       var n=el('projNewName').value; if(n && n.trim()){ addProject(n); el('projNewName').value=''; el('projNewName').focus(); }
@@ -1512,6 +1553,46 @@
     }).catch(function(){});
   }
   function syncTP(){ pullProjects(); pullTasks(); pullReviews(); }
+
+  // ---- log focus time manually (forgot to start the timer) ----
+  var manProjects=[];
+  function renderManProjectPills(){
+    var box=el('manProjectPills'); if(!box) return;
+    var sorted=projSorted();
+    if(!sorted.length){ box.innerHTML='<div class="dist-empty">No projects yet — add them in the Tasks tab.</div>'; return; }
+    var h=''; sorted.forEach(function(p){ h+='<div class="pill'+(manProjects.indexOf(p.name)>=0?' active':'')+'" data-manproj="'+esc(p.name)+'">'+esc(p.name)+'</div>'; });
+    box.innerHTML=h;
+  }
+  function openManual(){
+    manProjects=[];
+    el('manPlan').value=''; el('manMin').value=''; el('manNotes').value='';
+    el('manWhen').value=localDT(nowMs());
+    el('manErr').classList.remove('show');
+    renderManProjectPills();
+    openModal('manualOverlay');
+    setTimeout(function(){ el('manPlan').focus(); }, 50);
+  }
+  function saveManual(){
+    var plan=el('manPlan').value.trim();
+    var mins=parseInt(el('manMin').value,10);
+    if(!plan || isNaN(mins) || mins<1){ el('manErr').classList.add('show'); return; }
+    mins=Math.min(mins,1440);
+    var startedAt=nowMs(), wv=el('manWhen').value;
+    if(wv){ var d=new Date(wv); if(!isNaN(d.getTime())) startedAt=d.getTime(); }
+    var focusMs=mins*60000;
+    var rec={
+      id:uid(), date:dateKey(startedAt), plan:plan, notes:el('manNotes').value,
+      plannedMinutes:mins, projects:manProjects.slice(),
+      startedAt:startedAt, endedAt:startedAt+focusMs,
+      status:'completed', stopReason:'', pauses:[],
+      pauseMs:0, focusMs:focusMs,
+      distractions:[], synced:false
+    };
+    sessions.push(rec);
+    persist(); renderReport(); renderTodayStats();
+    closeModal('manualOverlay');
+    pushSave(rec);
+  }
 
   // ============ init ============
   function init(){
